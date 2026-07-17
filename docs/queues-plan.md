@@ -154,6 +154,19 @@ debug / replay.
 - **P4 — Frontend** quản lý queue + viewer + dead-letter replay.
 - **P5 — Retention + docs** (`docs/queues.md` theo style `schedules.md`).
 
-## 13. Quyết định còn mở
-- **Consumer cố định / queue** (phương án chọn, đơn giản) **vs message tự chỉ định workflow**
-  (linh hoạt, phức tạp hơn). Plan hiện theo phương án cố định.
+## 13. Quyết định đã chốt
+- **1 consumer workflow cố định / queue** (thay vì nhiều consumer, hay message tự chỉ định
+  workflow). Lý do: giữ model phẳng "1 queue = 1 kênh việc, 1 loại xử lý, DB là state machine
+  1 giá trị status/message". Hai nhu cầu hay bị gộp vào "nhiều consumer" đều đã có lời giải
+  tốt hơn mà không phá model:
+  - **Chạy song song nhanh hơn** → dùng cột `Concurrency` (N execution *cùng* consumer chạy
+    song song — competing workers). KHÔNG cần nhiều workflow.
+  - **1 message → kích nhiều workflow khác nhau (fan-out/pub-sub)** → hoặc (a) tạo nhiều queue,
+    producer push vào từng cái (mỗi queue có backlog/retry/dead-letter riêng, dễ debug); hoặc
+    (b) consumer duy nhất gọi sub-workflow (đã có child execution `RunWithDepth`).
+- **Vì sao không cho nhiều consumer/queue:** pub-sub (mỗi msg → tất cả consumer) buộc track
+  ack/retry/dead-letter riêng cho từng consumer trên từng message → status không còn 1 giá trị,
+  nhân bội độ phức tạp. Load-balance khác-workflow thì vô nghĩa (khác workflow xử lý cùng payload
+  = phải cùng contract = thực chất 1 workflow, và đó là việc của `Concurrency`).
+- **Nếu sau này thật sự cần pub-sub** 1-message-nhiều-subscriber → thêm *sau* như layer riêng
+  (queue có nhiều subscriber + bảng delivery riêng per-subscriber), không nhét vào core.
