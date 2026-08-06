@@ -19,7 +19,7 @@ services:
       - "host.docker.internal:host-gateway"
 
   orchestrator:
-    image: deeair/excute-command-orchestrator:latest
+    image: deeair/execute-command-orchestrator:latest
     build:
       context: .
       dockerfile: Dockerfile
@@ -37,6 +37,7 @@ services:
       DB_TIMEZONE: UTC
       SERVER_PORT: 8080
       ALLOWED_ORIGIN: http://localhost
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
     depends_on:
       - db
     volumes:
@@ -47,7 +48,7 @@ services:
       - "host.docker.internal:host-gateway"
 
   agent:
-    image: deeair/excute-command-agent:latest
+    image: deeair/execute-command-agent:latest
     build:
       context: .
       dockerfile: Dockerfile.agent

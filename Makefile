@@ -51,5 +51,11 @@ dev: ## Run both BE and FE (requires manual control or background execution)
 	@make -j 2 run-be run-fe
 
 docker-build-push: ## Build and push docker images for EC2 (linux/amd64)
-	docker buildx build --platform linux/amd64 -t deeair/excute-command-orchestrator:latest --push .
-# 	docker buildx build --platform linux/amd64 -t deeair/excute-command-agent:latest -f Dockerfile.agent --push .
+	docker buildx build --platform linux/amd64 -t deeair/execute-command-orchestrator:latest --push .
+# 	docker buildx build --platform linux/amd64 -t deeair/execute-command-agent:latest -f Dockerfile.agent --push .
+
+docker-push-readme: ## Push docs/DOCKERHUB.md as the Docker Hub repository overview
+	docker run --rm -v $(PWD):/data \
+		-e DOCKER_USER -e DOCKER_PASS \
+		chko/docker-pushrm --file /data/docs/DOCKERHUB.md \
+		docker.io/deeair/execute-command-orchestrator

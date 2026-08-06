@@ -71,6 +71,25 @@ For a one-command setup of the entire stack (Database, Orchestrator, and Agent):
 > [!TIP]
 > Use `docker-compose logs -f` to monitor the logs of all running services.
 
+### Default Account
+
+On first start the backend seeds an administrator account:
+
+| Field | Value |
+|-------|-------|
+| Username | `admin` |
+| Password | `admin` (or the value of `ADMIN_PASSWORD`) |
+| Email | `admin@example.com` |
+
+Set a different password before the first run:
+
+```bash
+ADMIN_PASSWORD=your-strong-password docker-compose up -d
+```
+
+> [!WARNING]
+> The account is seeded only when no `admin` user exists yet. Changing `ADMIN_PASSWORD` afterwards has no effect — change the password from the dashboard instead. Always replace the default password before exposing CSM outside localhost.
+
 ## Features
 - **Intelligent Orchestration**: Sequential and conditional command execution.
 - **Modern UI**: A premium, responsive admin dashboard built with React + Tailwind.
