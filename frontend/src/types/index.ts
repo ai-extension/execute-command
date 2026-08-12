@@ -442,6 +442,13 @@ export interface PageWidget {
     // the frame and its child widgets render. Child widgets size relative to the section's
     // own width (see PublicPageView / PageDesignerPage container-query layout).
     hide_header?: boolean;
+    // "Updated" badge — any type. Defined (even as '') means the author enabled the badge
+    // section in the designer; the badge itself only renders while the server date
+    // (Page.server_time) is still on or before `updated_until`. Undefined → feature off.
+    updated_until?: string;
+    // Badge wording / lucide icon name. Unset → "Updated" with the sparkles icon.
+    updated_label?: string;
+    updated_icon?: string;
 }
 
 export interface PageLayout {
@@ -472,6 +479,9 @@ export interface Page {
     created_by_username?: string;
     created_at?: string;
     updated_at?: string;
+    // Server clock at response time (RFC3339), only sent on public page responses.
+    // Used to decide whether a widget's `updated_until` badge window is still open.
+    server_time?: string;
 }
 
 export interface User {

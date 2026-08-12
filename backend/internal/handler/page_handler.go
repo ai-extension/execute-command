@@ -1044,6 +1044,8 @@ func (h *PageHandler) sanitizePage(page *domain.Page) {
 		return
 	}
 	page.Password = "" // Never return the hash to public users
+	now := time.Now()
+	page.ServerTime = &now // Reference clock for time-boxed widget badges
 	for i := range page.Workflows {
 		if page.Workflows[i].Workflow != nil {
 			page.Workflows[i].Workflow.DefaultServerID = nil // Hide internal server IDs

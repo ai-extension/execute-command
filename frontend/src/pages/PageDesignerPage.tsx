@@ -5,7 +5,7 @@ import {
     Settings as SettingsIcon, Globe, Lock, Copy,
     Terminal, Zap, Monitor, RefreshCw, X, Palette, Clock, ServerIcon, Link2, Type,
     FileText, ImageIcon, Frame, Activity, Table2, BarChart3, TrendingUp,
-    Gauge, Target, LayoutGrid
+    Gauge, Target, LayoutGrid, Sparkles
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -21,6 +21,7 @@ import { TagSelector } from '../components/TagSelector';
 import { ButtonStylePicker, resolveButtonStyle } from '../components/ButtonStylePicker';
 import { DatasetSourceConfig } from '../components/page-designer/DatasetSourceConfig';
 import { searchIcons, WidgetIcon } from '../lib/widgetIcons';
+import { DEFAULT_UPDATED_LABEL } from '../lib/updatedBadge';
 import { PAGE_WIDGET_SIZES, SIZE_LABELS, normalizeWidgetSize, editorTopWidthClass, childWidthClass } from '../lib/widgetSizes';
 
 
@@ -87,6 +88,81 @@ const PALETTE_ITEMS: PaletteItem[] = [
       icon: <Activity className="w-3.5 h-3.5" />,
       iconClass: 'bg-cyan-500/10 text-cyan-500 group-hover:bg-cyan-500/20' },
 ];
+
+// Searchable lucide icon grid. `value` is the stored icon name (undefined → the caller's
+// own default), and the search box keeps its own state so several pickers can coexist.
+const IconPicker: React.FC<{
+    value?: string;
+    onChange: (name: string | undefined) => void;
+    defaultTitle: string;
+}> = ({ value, onChange, defaultTitle }) => {
+    const [search, setSearch] = useState('');
+    const results = searchIcons(search);
+    return (
+        <>
+            <Input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Search icons… e.g. rocket, server, chart"
+                className="h-9 text-sm bg-muted/30 border border-border/50 rounded-md" />
+            <div className="flex flex-wrap gap-1.5 max-h-44 overflow-y-auto custom-scrollbar p-0.5">
+                <button
+                    type="button"
+                    title={defaultTitle}
+                    onClick={() => onChange(undefined)}
+                    className={cn(
+                        "h-8 w-8 rounded-md border flex items-center justify-center text-xs font-black transition-all shrink-0",
+                        !value ? "border-primary bg-primary/10 text-primary" : "border-border/50 text-muted-foreground hover:bg-muted/40"
+                    )}>
+                    —
+                </button>
+                {results.map(name => (
+                    <button
+                        key={name}
+                        type="button"
+                        title={name}
+                        onClick={() => onChange(name)}
+                        className={cn(
+                            "h-8 w-8 rounded-md border flex items-center justify-center transition-all shrink-0",
+                            value === name ? "border-primary bg-primary/10 text-primary" : "border-border/50 text-muted-foreground hover:bg-muted/40"
+                        )}>
+                        <WidgetIcon name={name} className="w-4 h-4" />
+                    </button>
+                ))}
+            </div>
+            <p className="text-[10px] text-muted-foreground/60 px-1">
+                {search.trim()
+                    ? (results.length >= 72 ? 'Showing first 72 matches — refine your search.' : `${results.length} match${results.length === 1 ? '' : 'es'}${value ? ` · current: ${value}` : ''}`)
+                    : `Popular icons · type to search all${value ? ` · current: ${value}` : ''}`}
+            </p>
+        </>
+    );
+};
+
+// Editor-only preview of the "updated" badge. The public page hides the badge once the
+// server date passes `widget.updated_until`; the designer always shows it (with the date)
+// so the author can see and clear a stale window.
+const UpdatedUntilTag: React.FC<{ widget: PageWidget }> = ({ widget }) => {
+    if (widget.updated_until === undefined) return null;
+    return (
+        <div className="absolute -top-2 left-3 z-20 pointer-events-none">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500 text-white text-[9px] font-black uppercase tracking-widest shadow-md">
+                <WidgetIcon name={widget.updated_icon} fallback={Sparkles} className="w-2.5 h-2.5" />
+                {widget.updated_label || DEFAULT_UPDATED_LABEL}
+                {widget.updated_until ? ` · until ${widget.updated_until}` : ' · no date'}
+            </span>
+        </div>
+    );
+};
+
+// Label/unit hints per metric-style widget, so the shared Label+Unit pair in the settings
+// modal keeps the wording each type used before they were merged.
+const METRIC_PLACEHOLDERS: Record<'METRIC' | 'GAUGE' | 'PROGRESS' | 'SPARKLINE', { label: string; unit: string }> = {
+    METRIC: { label: 'e.g. Users', unit: 'e.g. orders / hr' },
+    GAUGE: { label: 'e.g. CPU', unit: '%' },
+    PROGRESS: { label: 'e.g. Quota', unit: 'GB' },
+    SPARKLINE: { label: 'e.g. Requests', unit: '/min' },
+};
 
 // Per-type defaults. Pulled out of the React component so palette drops can use the
 // same factory as the click handlers.
@@ -337,7 +413,6 @@ const PageDesignerPage = () => {
     const [widgets, setWidgets] = useState<PageWidget[]>([]);
     const [editingWidgetId, setEditingWidgetId] = useState<string | null>(null);
     const [draggingSectionId, setDraggingSectionId] = useState<string | null>(null);
-    const [iconSearch, setIconSearch] = useState('');
 
     // Available data
     const [availableWorkflows, setAvailableWorkflows] = useState<Workflow[]>([]);
@@ -859,8 +934,8 @@ const PageDesignerPage = () => {
                                                                     ref={provided.innerRef}
                                                                     {...provided.draggableProps}
                                                                     className={cn(
-                                                                        "transition-all duration-200 rounded-md",
-                                                                        widget.type !== 'SECTION' && "relative group/tb",
+                                                                        "transition-all duration-200 rounded-md relative",
+                                                                        widget.type !== 'SECTION' && "group/tb",
                                                                         editorTopWidthClass(widget.size),
                                                                         snapshot.isDragging && "opacity-80 scale-[1.02] z-50",
                                                                         snapshot.combineTargetFor && widget.type === 'SECTION' && "ring-2 ring-primary ring-offset-2 ring-offset-background scale-[1.01]"
@@ -870,6 +945,7 @@ const PageDesignerPage = () => {
                                                                         onEdit: () => setEditingWidgetId(widget.id),
                                                                         onRemove: () => removeWidget(widget.id),
                                                                     })}
+                                                                    <UpdatedUntilTag widget={widget} />
                                                                     {widget.type === 'ENDPOINT' ? (
                                                                         <EndpointWidgetCard
                                                                             widget={widget}
@@ -933,6 +1009,7 @@ const PageDesignerPage = () => {
                                                                                                             childSnapshot.isDragging && "opacity-80 scale-[1.02] z-50"
                                                                                                         )}
                                                                                                     >
+                                                                                                        <UpdatedUntilTag widget={child} />
                                                                                                         {renderToolbar({
                                                                                                             onEdit: () => setEditingWidgetId(child.id),
                                                                                                             onRemove: () => removeWidget(child.id),
@@ -1163,74 +1240,25 @@ const PageDesignerPage = () => {
                     onClick={() => setEditingWidgetId(null)}
                 >
                     <div
-                        className="w-full max-w-lg bg-card border border-border rounded-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col"
+                        className="w-full max-w-[920px] max-h-[90vh] bg-card border border-border rounded-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col"
                         onClick={e => e.stopPropagation()}
                     >
-                        <div className="p-8 space-y-6 max-h-[85vh] overflow-y-auto custom-scrollbar">
-                            <div className="grid grid-cols-2 gap-6">
+                        <div className="px-6 py-4 border-b border-border shrink-0">
+                            <p className="text-lg font-black tracking-tight">Widget Settings</p>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                                {PALETTE_ITEMS.find(p => p.type === activeWidget.type)?.label || activeWidget.type}
+                            </p>
+                        </div>
+
+                        <div className="flex-1 min-h-0 overflow-y-auto md:overflow-hidden flex flex-col md:flex-row">
+                            {/* LEFT — content & data (what the widget says / where it pulls from) */}
+                            <div className="md:w-1/2 shrink-0 md:overflow-y-auto custom-scrollbar md:border-r border-border p-6 space-y-6">
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Widget Title</label>
                                     <Input value={activeWidget.title} onChange={e => updateWidget(activeWidget.id, { title: e.target.value })} className="h-9 text-sm font-bold bg-muted/30 border border-border/50 rounded-md" />
                                 </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Width</label>
-                                    <select value={activeWidget.size} onChange={e => updateWidget(activeWidget.id, { size: e.target.value as any })}
-                                        className="w-full h-9 bg-muted/30 border border-border/50 rounded-md text-xs px-4 outline-none font-bold appearance-none cursor-pointer">
-                                        {PAGE_WIDGET_SIZES.map(sz => (
-                                            <option key={sz} value={sz} className="bg-popover text-foreground">{SIZE_LABELS[sz]}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
 
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Icon (shown on public page)</label>
-                                <Input
-                                    value={iconSearch}
-                                    onChange={e => setIconSearch(e.target.value)}
-                                    placeholder="Search icons… e.g. rocket, server, chart"
-                                    className="h-9 text-sm bg-muted/30 border border-border/50 rounded-md" />
-                                {(() => {
-                                    const results = searchIcons(iconSearch);
-                                    return (
-                                        <>
-                                            <div className="flex flex-wrap gap-1.5 max-h-44 overflow-y-auto custom-scrollbar p-0.5">
-                                                <button
-                                                    type="button"
-                                                    title="Default (per type)"
-                                                    onClick={() => updateWidget(activeWidget.id, { icon: undefined })}
-                                                    className={cn(
-                                                        "h-8 w-8 rounded-md border flex items-center justify-center text-xs font-black transition-all shrink-0",
-                                                        !activeWidget.icon ? "border-primary bg-primary/10 text-primary" : "border-border/50 text-muted-foreground hover:bg-muted/40"
-                                                    )}>
-                                                    —
-                                                </button>
-                                                {results.map(name => (
-                                                    <button
-                                                        key={name}
-                                                        type="button"
-                                                        title={name}
-                                                        onClick={() => updateWidget(activeWidget.id, { icon: name })}
-                                                        className={cn(
-                                                            "h-8 w-8 rounded-md border flex items-center justify-center transition-all shrink-0",
-                                                            activeWidget.icon === name ? "border-primary bg-primary/10 text-primary" : "border-border/50 text-muted-foreground hover:bg-muted/40"
-                                                        )}>
-                                                        <WidgetIcon name={name} className="w-4 h-4" />
-                                                    </button>
-                                                ))}
-                                            </div>
-                                            <p className="text-[10px] text-muted-foreground/60 px-1">
-                                                {iconSearch.trim()
-                                                    ? (results.length >= 72 ? 'Showing first 72 matches — refine your search.' : `${results.length} match${results.length === 1 ? '' : 'es'}${activeWidget.icon ? ` · current: ${activeWidget.icon}` : ''}`)
-                                                    : `Popular icons · type to search all${activeWidget.icon ? ` · current: ${activeWidget.icon}` : ''}`}
-                                            </p>
-                                        </>
-                                    );
-                                })()}
-                            </div>
-
-                            {activeWidget.type === 'SECTION' && (
-                                <div className="space-y-6">
+                                {activeWidget.type === 'SECTION' && (
                                     <div className="space-y-2">
                                         <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Description / Subtitle</label>
                                         <textarea
@@ -1240,206 +1268,144 @@ const PageDesignerPage = () => {
                                             placeholder="Add context or instructions for this section..."
                                         />
                                     </div>
-                                    <div className="flex items-center justify-between p-5 bg-muted/20 rounded-md border border-border/40">
-                                        <div>
-                                            <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-1">Hide header</p>
-                                            <p className="text-xs font-medium text-muted-foreground leading-none">Keep only the frame — hide title &amp; description on the public page</p>
-                                        </div>
-                                        <button onClick={() => updateWidget(activeWidget.id, { hide_header: !activeWidget.hide_header })}
-                                            className={cn("w-12 h-6 rounded-full transition-all relative shrink-0 shadow-inner", activeWidget.hide_header ? "bg-primary" : "bg-muted-foreground/20")}>
-                                            <div className={cn("absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-200", activeWidget.hide_header ? "right-0.5" : "left-0.5")} />
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
+                                )}
 
-                            {activeWidget.type === 'LINK' && (
-                                <div className="space-y-6">
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1 flex items-center gap-2">
-                                            <Link2 className="w-3 h-3 text-indigo-500" /> Target URL
-                                        </label>
-                                        <Input value={activeWidget.url || ''} onChange={e => updateWidget(activeWidget.id, { url: e.target.value })} className="h-9 text-sm bg-muted/30 border border-border/50 rounded-md font-mono text-indigo-400" placeholder="https://" />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-6">
+                                {activeWidget.type === 'LINK' && (
+                                    <div className="space-y-6">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1 flex items-center gap-2">
+                                                <Link2 className="w-3 h-3 text-indigo-500" /> Target URL
+                                            </label>
+                                            <Input value={activeWidget.url || ''} onChange={e => updateWidget(activeWidget.id, { url: e.target.value })} className="h-9 text-sm bg-muted/30 border border-border/50 rounded-md font-mono text-indigo-400" placeholder="https://" />
+                                        </div>
                                         <div className="space-y-2">
                                             <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Button Label</label>
                                             <Input value={activeWidget.label || ''} onChange={e => updateWidget(activeWidget.id, { label: e.target.value })} className="h-9 text-sm bg-muted/30 border border-border/50 rounded-md" placeholder="e.g. Open Link" />
                                         </div>
                                         <div className="space-y-2">
-                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Style</label>
-                                            <ButtonStylePicker
-                                                presets={BUTTON_STYLES}
-                                                value={activeWidget.style || ''}
-                                                onChange={(val) => updateWidget(activeWidget.id, { style: val })}
+                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Description</label>
+                                            <textarea
+                                                value={activeWidget.description || ''}
+                                                onChange={e => updateWidget(activeWidget.id, { description: e.target.value })}
+                                                className="w-full min-h-[80px] p-4 text-xs bg-muted/30 border border-border/50 rounded-md focus:ring-2 ring-primary/10 outline-none resize-none transition-all"
+                                                placeholder="Add a short description for this link..."
                                             />
                                         </div>
                                     </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Description</label>
-                                        <textarea
-                                            value={activeWidget.description || ''}
-                                            onChange={e => updateWidget(activeWidget.id, { description: e.target.value })}
-                                            className="w-full min-h-[80px] p-4 text-xs bg-muted/30 border border-border/50 rounded-md focus:ring-2 ring-primary/10 outline-none resize-none transition-all"
-                                            placeholder="Add a short description for this link..."
-                                        />
-                                    </div>
-                                    <div className="flex items-center justify-between p-5 bg-muted/20 rounded-md border border-border/40">
-                                        <div>
-                                            <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-1">Open in new tab</p>
-                                            <p className="text-xs font-medium text-muted-foreground leading-none">Launch link in a separate window</p>
-                                        </div>
-                                        <button onClick={() => updateWidget(activeWidget.id, { new_tab: !activeWidget.new_tab })}
-                                            className={cn("w-12 h-6 rounded-full transition-all relative shrink-0 shadow-inner", activeWidget.new_tab ? "bg-primary" : "bg-muted-foreground/20")}>
-                                            <div className={cn("absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-200", activeWidget.new_tab ? "right-0.5" : "left-0.5")} />
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
+                                )}
 
-                            {activeWidget.type === 'ENDPOINT' && (
-                                <div className="space-y-6">
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2 px-1">
-                                            <Zap className="w-3 h-3 text-primary" /> Target Workflow
-                                        </label>
-                                        <SearchableSelect
-                                            options={[
-                                                ...(activeWidget.workflow_id && activeWidget.workflow_name && !availableWorkflows.some(w => w.id === activeWidget.workflow_id)
-                                                    ? [{ label: activeWidget.workflow_name, value: activeWidget.workflow_id }]
-                                                    : []),
-                                                ...availableWorkflows.map(wf => ({ label: wf.name, value: wf.id }))
-                                            ]}
-                                            value={activeWidget.workflow_id || ''}
-                                            onValueChange={(val) => {
-                                                const wf = availableWorkflows.find(w => w.id === val);
-                                                updateWidget(activeWidget.id, {
-                                                    workflow_id: val,
-                                                    workflow_name: wf?.name || activeWidget.workflow_name,
-                                                    label: wf?.name || activeWidget.label
-                                                });
-                                            }}
-                                            onSearch={fetchWorkflows}
-                                            placeholder="Select workflow..."
-                                            isSearchable
-                                            triggerClassName="h-9 text-xs font-bold bg-muted/30 border border-border/50 rounded-md"
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-6">
+                                {activeWidget.type === 'ENDPOINT' && (
+                                    <div className="space-y-6">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2 px-1">
+                                                <Zap className="w-3 h-3 text-primary" /> Target Workflow
+                                            </label>
+                                            <SearchableSelect
+                                                options={[
+                                                    ...(activeWidget.workflow_id && activeWidget.workflow_name && !availableWorkflows.some(w => w.id === activeWidget.workflow_id)
+                                                        ? [{ label: activeWidget.workflow_name, value: activeWidget.workflow_id }]
+                                                        : []),
+                                                    ...availableWorkflows.map(wf => ({ label: wf.name, value: wf.id }))
+                                                ]}
+                                                value={activeWidget.workflow_id || ''}
+                                                onValueChange={(val) => {
+                                                    const wf = availableWorkflows.find(w => w.id === val);
+                                                    updateWidget(activeWidget.id, {
+                                                        workflow_id: val,
+                                                        workflow_name: wf?.name || activeWidget.workflow_name,
+                                                        label: wf?.name || activeWidget.label
+                                                    });
+                                                }}
+                                                onSearch={fetchWorkflows}
+                                                placeholder="Select workflow..."
+                                                isSearchable
+                                                triggerClassName="h-9 text-xs font-bold bg-muted/30 border border-border/50 rounded-md"
+                                            />
+                                        </div>
                                         <div className="space-y-2">
                                             <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Button Label</label>
                                             <Input value={activeWidget.label || ''} onChange={e => updateWidget(activeWidget.id, { label: e.target.value })} className="h-9 text-sm bg-muted/30 border border-border/50 rounded-md" placeholder="e.g. Deploy" />
                                         </div>
                                         <div className="space-y-2">
-                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Style</label>
-                                            <ButtonStylePicker
-                                                presets={BUTTON_STYLES}
-                                                value={activeWidget.style || 'premium-gradient'}
-                                                onChange={(val) => updateWidget(activeWidget.id, { style: val })}
+                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Description</label>
+                                            <textarea
+                                                value={activeWidget.description || ''}
+                                                onChange={e => updateWidget(activeWidget.id, { description: e.target.value })}
+                                                className="w-full min-h-[80px] p-4 text-xs bg-muted/30 border border-border/50 rounded-md focus:ring-2 ring-primary/10 outline-none resize-none transition-all"
+                                                placeholder="Explain what this endpoint does..."
                                             />
                                         </div>
                                     </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Description</label>
-                                        <textarea
-                                            value={activeWidget.description || ''}
-                                            onChange={e => updateWidget(activeWidget.id, { description: e.target.value })}
-                                            className="w-full min-h-[80px] p-4 text-xs bg-muted/30 border border-border/50 rounded-md focus:ring-2 ring-primary/10 outline-none resize-none transition-all"
-                                            placeholder="Explain what this endpoint does..."
-                                        />
-                                    </div>
-                                    <div className="flex items-center justify-between p-5 bg-muted/20 rounded-md border border-border/40">
-                                        <div>
-                                            <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-1">Execution Trace</p>
-                                            <p className="text-xs font-medium text-muted-foreground leading-none">Show live logs after triggering</p>
-                                        </div>
-                                        <button onClick={() => updateWidget(activeWidget.id, { show_log: !activeWidget.show_log })}
-                                            className={cn("w-12 h-6 rounded-full transition-all relative shrink-0 shadow-inner", activeWidget.show_log ? "bg-primary" : "bg-muted-foreground/20")}>
-                                            <div className={cn("absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-200", activeWidget.show_log ? "right-0.5" : "left-0.5")} />
-                                        </button>
-                                    </div>
-                                    <div className="flex items-center justify-between p-5 bg-muted/20 rounded-md border border-border/40">
-                                        <div>
-                                            <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-1">Allow Scheduling</p>
-                                            <p className="text-xs font-medium text-muted-foreground leading-none">Show a "Schedule" button on the public page (one-time or daily-recurring)</p>
-                                        </div>
-                                        <button onClick={() => updateWidget(activeWidget.id, { allow_schedule: !activeWidget.allow_schedule })}
-                                            className={cn("w-12 h-6 rounded-full transition-all relative shrink-0 shadow-inner", activeWidget.allow_schedule ? "bg-primary" : "bg-muted-foreground/20")}>
-                                            <div className={cn("absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-200", activeWidget.allow_schedule ? "right-0.5" : "left-0.5")} />
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
+                                )}
 
-                            {activeWidget.type === 'TERMINAL' && (
-                                <div className="space-y-6">
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2 px-1">
-                                            <ServerIcon className="w-3 h-3 text-emerald-500" /> Target Server
-                                        </label>
-                                        <SearchableSelect
-                                            options={[
-                                                ...(activeWidget.server_id && activeWidget.server_name && !servers.some(s => s.id === activeWidget.server_id)
-                                                    ? [{ label: activeWidget.server_name, value: activeWidget.server_id }]
-                                                    : []),
-                                                ...servers.map(s => ({ label: `${s.name} (${s.host})`, value: s.id }))
-                                            ]}
-                                            value={activeWidget.server_id || ''}
-                                            onValueChange={(val) => {
-                                                const srv = servers.find(s => s.id === val);
-                                                updateWidget(activeWidget.id, {
-                                                    server_id: val,
-                                                    server_name: srv?.name || activeWidget.server_name
-                                                });
-                                            }}
-                                            onSearch={fetchServers}
-                                            placeholder="Select server..."
-                                            isSearchable
-                                            triggerClassName="h-9 text-xs font-bold bg-muted/30 border border-border/50 rounded-md"
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Execute Command</label>
-                                        <textarea
-                                            value={activeWidget.command || ''}
-                                            onChange={e => updateWidget(activeWidget.id, { command: e.target.value })}
-                                            placeholder="e.g. top -b -n 1"
-                                            className="w-full min-h-[80px] p-4 text-xs font-mono bg-muted/30 border border-border/50 rounded-md focus:ring-2 ring-primary/10 outline-none resize-y transition-all"
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Run Interval</label>
-                                        <div className="flex gap-2 flex-wrap items-center">
-                                            {[{ label: 'Once', value: undefined }, { label: '5s', value: 5 }, { label: '10s', value: 10 }, { label: '30s', value: 30 }, { label: '1m', value: 60 }].map(opt => (
-                                                <button key={opt.label} onClick={() => updateWidget(activeWidget.id, { run_interval: opt.value })}
-                                                    className={cn("h-9 px-4 rounded-md text-[10px] font-black transition-all border shrink-0",
-                                                        activeWidget.run_interval === opt.value
-                                                            ? "bg-emerald-500/10 border-emerald-500 text-emerald-500"
-                                                            : "bg-muted/30 border-transparent text-muted-foreground hover:border-emerald-500/50")}>
-                                                    {opt.label}
-                                                </button>
-                                            ))}
-                                            <div className="relative flex-1 min-w-[100px]">
-                                                <Input
-                                                    type="number"
-                                                    value={activeWidget.run_interval || ''}
-                                                    onChange={e => {
-                                                        const val = parseInt(e.target.value, 10);
-                                                        updateWidget(activeWidget.id, { run_interval: isNaN(val) ? undefined : val });
-                                                    }}
-                                                    min="1"
-                                                    placeholder="Custom..."
-                                                    className="h-9 text-xs font-bold bg-muted/30 border border-border/50 rounded-md pl-3 pr-8 focus:border-emerald-500/50 focus:ring-emerald-500/20 transition-all shadow-sm"
-                                                />
-                                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-muted-foreground">s</span>
+                                {activeWidget.type === 'TERMINAL' && (
+                                    <div className="space-y-6">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2 px-1">
+                                                <ServerIcon className="w-3 h-3 text-emerald-500" /> Target Server
+                                            </label>
+                                            <SearchableSelect
+                                                options={[
+                                                    ...(activeWidget.server_id && activeWidget.server_name && !servers.some(s => s.id === activeWidget.server_id)
+                                                        ? [{ label: activeWidget.server_name, value: activeWidget.server_id }]
+                                                        : []),
+                                                    ...servers.map(s => ({ label: `${s.name} (${s.host})`, value: s.id }))
+                                                ]}
+                                                value={activeWidget.server_id || ''}
+                                                onValueChange={(val) => {
+                                                    const srv = servers.find(s => s.id === val);
+                                                    updateWidget(activeWidget.id, {
+                                                        server_id: val,
+                                                        server_name: srv?.name || activeWidget.server_name
+                                                    });
+                                                }}
+                                                onSearch={fetchServers}
+                                                placeholder="Select server..."
+                                                isSearchable
+                                                triggerClassName="h-9 text-xs font-bold bg-muted/30 border border-border/50 rounded-md"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Execute Command</label>
+                                            <textarea
+                                                value={activeWidget.command || ''}
+                                                onChange={e => updateWidget(activeWidget.id, { command: e.target.value })}
+                                                placeholder="e.g. top -b -n 1"
+                                                className="w-full min-h-[80px] p-4 text-xs font-mono bg-muted/30 border border-border/50 rounded-md focus:ring-2 ring-primary/10 outline-none resize-y transition-all"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Run Interval</label>
+                                            <div className="flex gap-2 flex-wrap items-center">
+                                                {[{ label: 'Once', value: undefined }, { label: '5s', value: 5 }, { label: '10s', value: 10 }, { label: '30s', value: 30 }, { label: '1m', value: 60 }].map(opt => (
+                                                    <button key={opt.label} onClick={() => updateWidget(activeWidget.id, { run_interval: opt.value })}
+                                                        className={cn("h-9 px-4 rounded-md text-[10px] font-black transition-all border shrink-0",
+                                                            activeWidget.run_interval === opt.value
+                                                                ? "bg-emerald-500/10 border-emerald-500 text-emerald-500"
+                                                                : "bg-muted/30 border-transparent text-muted-foreground hover:border-emerald-500/50")}>
+                                                        {opt.label}
+                                                    </button>
+                                                ))}
+                                                <div className="relative flex-1 min-w-[100px]">
+                                                    <Input
+                                                        type="number"
+                                                        value={activeWidget.run_interval || ''}
+                                                        onChange={e => {
+                                                            const val = parseInt(e.target.value, 10);
+                                                            updateWidget(activeWidget.id, { run_interval: isNaN(val) ? undefined : val });
+                                                        }}
+                                                        min="1"
+                                                        placeholder="Custom..."
+                                                        className="h-9 text-xs font-bold bg-muted/30 border border-border/50 rounded-md pl-3 pr-8 focus:border-emerald-500/50 focus:ring-emerald-500/20 transition-all shadow-sm"
+                                                    />
+                                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-muted-foreground">s</span>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                            )}
+                                )}
 
-                            {activeWidget.type === 'TEXT' && (
-                                <div className="space-y-6">
+                                {activeWidget.type === 'TEXT' && (
                                     <div className="space-y-2">
                                         <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1 flex items-center gap-2">
                                             <FileText className="w-3 h-3 text-sky-500" /> Content
@@ -1451,172 +1417,140 @@ const PageDesignerPage = () => {
                                             placeholder="Enter text or markdown content..."
                                         />
                                     </div>
-                                </div>
-                            )}
+                                )}
 
-                            {activeWidget.type === 'IMAGE' && (
-                                <div className="space-y-6">
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1 flex items-center gap-2">
-                                            <ImageIcon className="w-3 h-3 text-pink-500" /> Image URL
-                                        </label>
-                                        <Input value={activeWidget.image_url || ''} onChange={e => updateWidget(activeWidget.id, { image_url: e.target.value })} className="h-9 text-sm bg-muted/30 border border-border/50 rounded-md font-mono text-pink-400" placeholder="https://example.com/image.png" />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Alt Text</label>
-                                        <Input value={activeWidget.alt_text || ''} onChange={e => updateWidget(activeWidget.id, { alt_text: e.target.value })} className="h-9 text-sm bg-muted/30 border border-border/50 rounded-md" placeholder="Describe the image..." />
-                                    </div>
-                                    {activeWidget.image_url && (
-                                        <div className="rounded-md overflow-hidden border border-border/50 bg-muted/20">
-                                            <img src={activeWidget.image_url} alt={activeWidget.alt_text || ''} className="w-full h-auto max-h-48 object-contain" onError={e => (e.currentTarget.style.display = 'none')} />
+                                {activeWidget.type === 'IMAGE' && (
+                                    <div className="space-y-6">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1 flex items-center gap-2">
+                                                <ImageIcon className="w-3 h-3 text-pink-500" /> Image URL
+                                            </label>
+                                            <Input value={activeWidget.image_url || ''} onChange={e => updateWidget(activeWidget.id, { image_url: e.target.value })} className="h-9 text-sm bg-muted/30 border border-border/50 rounded-md font-mono text-pink-400" placeholder="https://example.com/image.png" />
                                         </div>
-                                    )}
-                                </div>
-                            )}
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Alt Text</label>
+                                            <Input value={activeWidget.alt_text || ''} onChange={e => updateWidget(activeWidget.id, { alt_text: e.target.value })} className="h-9 text-sm bg-muted/30 border border-border/50 rounded-md" placeholder="Describe the image..." />
+                                        </div>
+                                    </div>
+                                )}
 
-                            {activeWidget.type === 'IFRAME' && (
-                                <div className="space-y-6">
+                                {activeWidget.type === 'IFRAME' && (
                                     <div className="space-y-2">
                                         <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1 flex items-center gap-2">
                                             <Frame className="w-3 h-3 text-violet-500" /> Embed URL
                                         </label>
                                         <Input value={activeWidget.iframe_url || ''} onChange={e => updateWidget(activeWidget.id, { iframe_url: e.target.value })} className="h-9 text-sm bg-muted/30 border border-border/50 rounded-md font-mono text-violet-400" placeholder="https://grafana.example.com/d/..." />
                                     </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Height (px)</label>
-                                        <Input type="number" value={activeWidget.iframe_height || 400} onChange={e => updateWidget(activeWidget.id, { iframe_height: parseInt(e.target.value) || 400 })} className="h-9 text-sm bg-muted/30 border border-border/50 rounded-md" min={100} max={2000} />
-                                    </div>
-                                </div>
-                            )}
+                                )}
 
-                            {activeWidget.type === 'STATUS' && (
-                                <div className="space-y-6">
-                                    <div className="grid grid-cols-2 gap-6">
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1 flex items-center gap-2">
-                                                <Activity className="w-3 h-3 text-teal-500" /> Label
-                                            </label>
-                                            <Input value={activeWidget.status_label || ''} onChange={e => updateWidget(activeWidget.id, { status_label: e.target.value })} className="h-9 text-sm bg-muted/30 border border-border/50 rounded-md" placeholder="e.g. API Server" />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Status</label>
-                                            <select value={activeWidget.status_value || 'ok'} onChange={e => updateWidget(activeWidget.id, { status_value: e.target.value as any })}
-                                                className="w-full h-9 bg-muted/30 border border-border/50 rounded-md text-xs px-4 outline-none font-bold appearance-none cursor-pointer">
-                                                <option value="ok" className="bg-popover text-foreground">OK</option>
-                                                <option value="warning" className="bg-popover text-foreground">Warning</option>
-                                                <option value="error" className="bg-popover text-foreground">Error</option>
-                                                <option value="info" className="bg-popover text-foreground">Info</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Description</label>
-                                        <Input value={activeWidget.description || ''} onChange={e => updateWidget(activeWidget.id, { description: e.target.value })} className="h-9 text-sm bg-muted/30 border border-border/50 rounded-md" placeholder="Optional status description..." />
-                                    </div>
-                                </div>
-                            )}
-
-                            {activeWidget.type === 'TABLE' && (
-                                <div className="space-y-6">
-                                    <DataSourceToggle widget={activeWidget} onChange={(v) => updateWidget(activeWidget.id, v)} />
-                                    {activeWidget.data_source === 'dataset' ? (
-                                        <>
-                                            <DatasetSourceConfig
-                                                value={activeWidget.dataset}
-                                                onChange={(v) => updateWidget(activeWidget.id, { dataset: v })}
-                                                slots={{ showGroupBy: true, showSelects: true, showSort: true, showColumns: true, showLimit: true }}
-                                            />
-                                            <ReloadIntervalPicker widget={activeWidget} onChange={(v) => updateWidget(activeWidget.id, v)} />
-                                        </>
-                                    ) : (
-                                        <>
+                                {activeWidget.type === 'STATUS' && (
+                                    <div className="space-y-6">
+                                        <div className="grid grid-cols-2 gap-6">
                                             <div className="space-y-2">
                                                 <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1 flex items-center gap-2">
-                                                    <Table2 className="w-3 h-3 text-orange-500" /> Column Headers
+                                                    <Activity className="w-3 h-3 text-teal-500" /> Label
                                                 </label>
-                                                <Input
-                                                    value={(activeWidget.table_headers || []).join(', ')}
-                                                    onChange={e => updateWidget(activeWidget.id, { table_headers: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
-                                                    className="h-9 text-sm bg-muted/30 border border-border/50 rounded-md"
-                                                    placeholder="Column 1, Column 2, Column 3"
-                                                />
-                                                <p className="text-[10px] text-muted-foreground px-1">Separate column names with commas</p>
+                                                <Input value={activeWidget.status_label || ''} onChange={e => updateWidget(activeWidget.id, { status_label: e.target.value })} className="h-9 text-sm bg-muted/30 border border-border/50 rounded-md" placeholder="e.g. API Server" />
                                             </div>
                                             <div className="space-y-2">
-                                                <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Data Rows</label>
-                                                <textarea
-                                                    value={(activeWidget.table_rows || []).map(row => row.join(', ')).join('\n')}
-                                                    onChange={e => updateWidget(activeWidget.id, {
-                                                        table_rows: e.target.value.split('\n').map(line => line.split(',').map(s => s.trim())).filter(row => row.some(cell => cell))
-                                                    })}
-                                                    className="w-full min-h-[120px] p-4 text-xs bg-muted/30 border border-border/50 rounded-md focus:ring-2 ring-primary/10 outline-none resize-y transition-all font-mono"
-                                                    placeholder="Row 1 Col 1, Row 1 Col 2, Row 1 Col 3&#10;Row 2 Col 1, Row 2 Col 2, Row 2 Col 3"
-                                                />
-                                                <p className="text-[10px] text-muted-foreground px-1">One row per line, separate cells with commas</p>
+                                                <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Status</label>
+                                                <select value={activeWidget.status_value || 'ok'} onChange={e => updateWidget(activeWidget.id, { status_value: e.target.value as any })}
+                                                    className="w-full h-9 bg-muted/30 border border-border/50 rounded-md text-xs px-4 outline-none font-bold appearance-none cursor-pointer">
+                                                    <option value="ok" className="bg-popover text-foreground">OK</option>
+                                                    <option value="warning" className="bg-popover text-foreground">Warning</option>
+                                                    <option value="error" className="bg-popover text-foreground">Error</option>
+                                                    <option value="info" className="bg-popover text-foreground">Info</option>
+                                                </select>
                                             </div>
-                                        </>
-                                    )}
-                                </div>
-                            )}
-
-                            {activeWidget.type === 'CHART' && (
-                                <div className="space-y-6">
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1 flex items-center gap-2">
-                                            <BarChart3 className="w-3 h-3 text-cyan-500" /> Chart Type
-                                        </label>
-                                        <div className="grid grid-cols-4 gap-1">
-                                            {(['bar', 'line', 'pie', 'area'] as const).map(k => (
-                                                <button key={k} type="button"
-                                                    onClick={() => updateWidget(activeWidget.id, { chart_kind: k })}
-                                                    className={cn(
-                                                        'h-8 rounded-md text-[10px] font-black uppercase tracking-widest transition-colors border',
-                                                        (activeWidget.chart_kind || 'bar') === k
-                                                            ? 'bg-cyan-500 text-white border-cyan-500'
-                                                            : 'bg-background text-muted-foreground border-border hover:bg-muted'
-                                                    )}>
-                                                    {k}
-                                                </button>
-                                            ))}
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Description</label>
+                                            <Input value={activeWidget.description || ''} onChange={e => updateWidget(activeWidget.id, { description: e.target.value })} className="h-9 text-sm bg-muted/30 border border-border/50 rounded-md" placeholder="Optional status description..." />
                                         </div>
                                     </div>
-                                    <DataSourceToggle widget={activeWidget} onChange={(v) => updateWidget(activeWidget.id, v)} />
-                                    {activeWidget.data_source === 'dataset' ? (
-                                        <>
-                                            <DatasetSourceConfig
-                                                value={activeWidget.dataset}
-                                                onChange={(v) => updateWidget(activeWidget.id, { dataset: v })}
-                                                slots={{ showGroupBy: true, showMetric: true, showFn: true, showLimit: true, showSort: true }}
-                                            />
-                                            <ReloadIntervalPicker widget={activeWidget} onChange={(v) => updateWidget(activeWidget.id, v)} />
-                                        </>
-                                    ) : (
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Static Data (JSON)</label>
-                                            <textarea
-                                                value={activeWidget.chart_static_data || ''}
-                                                onChange={(e) => updateWidget(activeWidget.id, { chart_static_data: e.target.value })}
-                                                className="w-full min-h-[120px] p-3 text-[11px] font-mono bg-muted/30 border border-border/50 rounded-md focus:ring-2 ring-primary/10 outline-none resize-y"
-                                                placeholder='[{"key":"A","value":10},{"key":"B","value":20}]'
-                                            />
-                                            {(() => {
-                                                const raw = activeWidget.chart_static_data || '';
-                                                if (!raw.trim()) return <p className="text-[10px] text-muted-foreground px-1">Array of {"{key, value}"} objects</p>;
-                                                try {
-                                                    const v = JSON.parse(raw);
-                                                    if (!Array.isArray(v)) return <p className="text-[10px] text-amber-500 px-1">Expected an array</p>;
-                                                    return <p className="text-[10px] text-emerald-500 px-1">✓ {v.length} entries</p>;
-                                                } catch {
-                                                    return <p className="text-[10px] text-destructive px-1">Invalid JSON</p>;
-                                                }
-                                            })()}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
+                                )}
 
-                            {activeWidget.type === 'METRIC' && (
-                                <div className="space-y-6">
+                                {activeWidget.type === 'TABLE' && (
+                                    <div className="space-y-6">
+                                        <DataSourceToggle widget={activeWidget} onChange={(v) => updateWidget(activeWidget.id, v)} />
+                                        {activeWidget.data_source === 'dataset' ? (
+                                            <>
+                                                <DatasetSourceConfig
+                                                    value={activeWidget.dataset}
+                                                    onChange={(v) => updateWidget(activeWidget.id, { dataset: v })}
+                                                    slots={{ showGroupBy: true, showSelects: true, showSort: true, showColumns: true, showLimit: true }}
+                                                />
+                                                <ReloadIntervalPicker widget={activeWidget} onChange={(v) => updateWidget(activeWidget.id, v)} />
+                                            </>
+                                        ) : (
+                                            <>
+                                                <div className="space-y-2">
+                                                    <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1 flex items-center gap-2">
+                                                        <Table2 className="w-3 h-3 text-orange-500" /> Column Headers
+                                                    </label>
+                                                    <Input
+                                                        value={(activeWidget.table_headers || []).join(', ')}
+                                                        onChange={e => updateWidget(activeWidget.id, { table_headers: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
+                                                        className="h-9 text-sm bg-muted/30 border border-border/50 rounded-md"
+                                                        placeholder="Column 1, Column 2, Column 3"
+                                                    />
+                                                    <p className="text-[10px] text-muted-foreground px-1">Separate column names with commas</p>
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Data Rows</label>
+                                                    <textarea
+                                                        value={(activeWidget.table_rows || []).map(row => row.join(', ')).join('\n')}
+                                                        onChange={e => updateWidget(activeWidget.id, {
+                                                            table_rows: e.target.value.split('\n').map(line => line.split(',').map(s => s.trim())).filter(row => row.some(cell => cell))
+                                                        })}
+                                                        className="w-full min-h-[120px] p-4 text-xs bg-muted/30 border border-border/50 rounded-md focus:ring-2 ring-primary/10 outline-none resize-y transition-all font-mono"
+                                                        placeholder="Row 1 Col 1, Row 1 Col 2, Row 1 Col 3&#10;Row 2 Col 1, Row 2 Col 2, Row 2 Col 3"
+                                                    />
+                                                    <p className="text-[10px] text-muted-foreground px-1">One row per line, separate cells with commas</p>
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                )}
+
+                                {activeWidget.type === 'CHART' && (
+                                    <div className="space-y-6">
+                                        <DataSourceToggle widget={activeWidget} onChange={(v) => updateWidget(activeWidget.id, v)} />
+                                        {activeWidget.data_source === 'dataset' ? (
+                                            <>
+                                                <DatasetSourceConfig
+                                                    value={activeWidget.dataset}
+                                                    onChange={(v) => updateWidget(activeWidget.id, { dataset: v })}
+                                                    slots={{ showGroupBy: true, showMetric: true, showFn: true, showLimit: true, showSort: true }}
+                                                />
+                                                <ReloadIntervalPicker widget={activeWidget} onChange={(v) => updateWidget(activeWidget.id, v)} />
+                                            </>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Static Data (JSON)</label>
+                                                <textarea
+                                                    value={activeWidget.chart_static_data || ''}
+                                                    onChange={(e) => updateWidget(activeWidget.id, { chart_static_data: e.target.value })}
+                                                    className="w-full min-h-[120px] p-3 text-[11px] font-mono bg-muted/30 border border-border/50 rounded-md focus:ring-2 ring-primary/10 outline-none resize-y"
+                                                    placeholder='[{"key":"A","value":10},{"key":"B","value":20}]'
+                                                />
+                                                {(() => {
+                                                    const raw = activeWidget.chart_static_data || '';
+                                                    if (!raw.trim()) return <p className="text-[10px] text-muted-foreground px-1">Array of {"{key, value}"} objects</p>;
+                                                    try {
+                                                        const v = JSON.parse(raw);
+                                                        if (!Array.isArray(v)) return <p className="text-[10px] text-amber-500 px-1">Expected an array</p>;
+                                                        return <p className="text-[10px] text-emerald-500 px-1">✓ {v.length} entries</p>;
+                                                    } catch {
+                                                        return <p className="text-[10px] text-destructive px-1">Invalid JSON</p>;
+                                                    }
+                                                })()}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {(activeWidget.type === 'METRIC' || activeWidget.type === 'GAUGE' || activeWidget.type === 'PROGRESS' || activeWidget.type === 'SPARKLINE') && (
                                     <div className="grid grid-cols-2 gap-3">
                                         <div className="space-y-1.5">
                                             <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Label</label>
@@ -1624,7 +1558,7 @@ const PageDesignerPage = () => {
                                                 value={activeWidget.metric_label || ''}
                                                 onChange={(e) => updateWidget(activeWidget.id, { metric_label: e.target.value })}
                                                 className="h-8 text-xs"
-                                                placeholder="e.g. Users"
+                                                placeholder={METRIC_PLACEHOLDERS[activeWidget.type].label}
                                             />
                                         </div>
                                         <div className="space-y-1.5">
@@ -1633,199 +1567,340 @@ const PageDesignerPage = () => {
                                                 value={activeWidget.metric_unit || ''}
                                                 onChange={(e) => updateWidget(activeWidget.id, { metric_unit: e.target.value })}
                                                 className="h-8 text-xs"
-                                                placeholder="e.g. orders / hr"
+                                                placeholder={METRIC_PLACEHOLDERS[activeWidget.type].unit}
                                             />
                                         </div>
                                     </div>
-                                    <div className="space-y-1.5">
-                                        <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Format</label>
-                                        <select
-                                            value={activeWidget.metric_format || 'number'}
-                                            onChange={(e) => updateWidget(activeWidget.id, { metric_format: e.target.value as PageWidget['metric_format'] })}
-                                            className="h-8 px-2 w-full text-xs font-bold border border-border rounded-md bg-background text-foreground outline-none cursor-pointer"
-                                        >
-                                            <option value="number">Number</option>
-                                            <option value="percent">Percent (×100)</option>
-                                            <option value="currency">Currency</option>
+                                )}
+
+                                {activeWidget.type === 'METRIC' && (
+                                    <div className="space-y-6">
+                                        <DataSourceToggle widget={activeWidget} onChange={(v) => updateWidget(activeWidget.id, v)} />
+                                        {activeWidget.data_source === 'dataset' ? (
+                                            <>
+                                                <DatasetSourceConfig
+                                                    value={activeWidget.dataset}
+                                                    onChange={(v) => updateWidget(activeWidget.id, { dataset: v })}
+                                                    slots={{ showGroupBy: false, showMetric: true, showFn: true, showLimit: false, showSort: false }}
+                                                />
+                                                <ReloadIntervalPicker widget={activeWidget} onChange={(v) => updateWidget(activeWidget.id, v)} />
+                                            </>
+                                        ) : (
+                                            <div className="space-y-1.5">
+                                                <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Static Value</label>
+                                                <Input
+                                                    value={activeWidget.metric_static_value || ''}
+                                                    onChange={(e) => updateWidget(activeWidget.id, { metric_static_value: e.target.value })}
+                                                    className="h-8 text-xs font-mono"
+                                                    placeholder="0"
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {activeWidget.type === 'GAUGE' && (
+                                    <div className="space-y-6">
+                                        <DataSourceToggle widget={activeWidget} onChange={(v) => updateWidget(activeWidget.id, v)} />
+                                        {activeWidget.data_source === 'dataset' ? (
+                                            <>
+                                                <DatasetSourceConfig value={activeWidget.dataset} onChange={(v) => updateWidget(activeWidget.id, { dataset: v })} slots={{ showGroupBy: false, showMetric: true, showFn: true, showLimit: false, showSort: false }} />
+                                                <ReloadIntervalPicker widget={activeWidget} onChange={(v) => updateWidget(activeWidget.id, v)} />
+                                            </>
+                                        ) : (
+                                            <div className="space-y-1.5">
+                                                <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Static Value</label>
+                                                <Input value={activeWidget.metric_static_value || ''} onChange={(e) => updateWidget(activeWidget.id, { metric_static_value: e.target.value })} className="h-8 text-xs font-mono" placeholder="65" />
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {activeWidget.type === 'PROGRESS' && (
+                                    <div className="space-y-6">
+                                        <DataSourceToggle widget={activeWidget} onChange={(v) => updateWidget(activeWidget.id, v)} />
+                                        {activeWidget.data_source === 'dataset' ? (
+                                            <>
+                                                <DatasetSourceConfig value={activeWidget.dataset} onChange={(v) => updateWidget(activeWidget.id, { dataset: v })} slots={{ showGroupBy: false, showMetric: true, showFn: true, showLimit: false, showSort: false }} />
+                                                <ReloadIntervalPicker widget={activeWidget} onChange={(v) => updateWidget(activeWidget.id, v)} />
+                                            </>
+                                        ) : (
+                                            <div className="space-y-1.5">
+                                                <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Static Value</label>
+                                                <Input value={activeWidget.metric_static_value || ''} onChange={(e) => updateWidget(activeWidget.id, { metric_static_value: e.target.value })} className="h-8 text-xs font-mono" placeholder="40" />
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {activeWidget.type === 'STAT_GRID' && (
+                                    <div className="space-y-6">
+                                        <DataSourceToggle widget={activeWidget} onChange={(v) => updateWidget(activeWidget.id, v)} />
+                                        {activeWidget.data_source === 'dataset' ? (
+                                            <>
+                                                <DatasetSourceConfig value={activeWidget.dataset} onChange={(v) => updateWidget(activeWidget.id, { dataset: v })} slots={{ showGroupBy: true, showMetric: true, showFn: true, showLimit: true, showSort: true }} />
+                                                <ReloadIntervalPicker widget={activeWidget} onChange={(v) => updateWidget(activeWidget.id, v)} />
+                                            </>
+                                        ) : (
+                                            <div className="space-y-1.5">
+                                                <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Static Data (JSON [&#123;key,value&#125;])</label>
+                                                <textarea value={activeWidget.chart_static_data || ''} onChange={(e) => updateWidget(activeWidget.id, { chart_static_data: e.target.value })} rows={4} className="w-full px-3 py-2 text-xs font-mono border border-border rounded-md bg-background text-foreground outline-none" placeholder='[{"key":"OK","value":12}]' />
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {activeWidget.type === 'SPARKLINE' && (
+                                    <div className="space-y-6">
+                                        <DataSourceToggle widget={activeWidget} onChange={(v) => updateWidget(activeWidget.id, v)} />
+                                        {activeWidget.data_source === 'dataset' ? (
+                                            <>
+                                                <DatasetSourceConfig value={activeWidget.dataset} onChange={(v) => updateWidget(activeWidget.id, { dataset: v })} slots={{ showGroupBy: true, showMetric: true, showFn: true, showLimit: true, showSort: true }} />
+                                                <ReloadIntervalPicker widget={activeWidget} onChange={(v) => updateWidget(activeWidget.id, v)} />
+                                            </>
+                                        ) : (
+                                            <div className="space-y-1.5">
+                                                <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Static Data (JSON [&#123;key,value&#125;])</label>
+                                                <textarea value={activeWidget.chart_static_data || ''} onChange={(e) => updateWidget(activeWidget.id, { chart_static_data: e.target.value })} rows={4} className="w-full px-3 py-2 text-xs font-mono border border-border rounded-md bg-background text-foreground outline-none" placeholder='[{"key":"Mon","value":10}]' />
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* RIGHT — appearance on the public page */}
+                            <div className="md:w-1/2 min-w-0 flex flex-col md:overflow-hidden">
+                                <div className="md:flex-1 md:overflow-y-auto custom-scrollbar p-6 space-y-6">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Width</label>
+                                        <select value={activeWidget.size} onChange={e => updateWidget(activeWidget.id, { size: e.target.value as any })}
+                                            className="w-full h-9 bg-muted/30 border border-border/50 rounded-md text-xs px-4 outline-none font-bold appearance-none cursor-pointer">
+                                            {PAGE_WIDGET_SIZES.map(sz => (
+                                                <option key={sz} value={sz} className="bg-popover text-foreground">{SIZE_LABELS[sz]}</option>
+                                            ))}
                                         </select>
                                     </div>
-                                    <DataSourceToggle widget={activeWidget} onChange={(v) => updateWidget(activeWidget.id, v)} />
-                                    {activeWidget.data_source === 'dataset' ? (
-                                        <>
-                                            <DatasetSourceConfig
-                                                value={activeWidget.dataset}
-                                                onChange={(v) => updateWidget(activeWidget.id, { dataset: v })}
-                                                slots={{ showGroupBy: false, showMetric: true, showFn: true, showLimit: false, showSort: false }}
+
+                                    {/* Update badge — collapsed until ticked. Enabled state is
+                                        `updated_until !== undefined`, so unticking drops every badge
+                                        field from the saved layout. */}
+                                    <div className="space-y-3 p-4 bg-muted/20 rounded-md border border-border/40">
+                                        <label className="flex items-center gap-2.5 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={activeWidget.updated_until !== undefined}
+                                                onChange={e => updateWidget(activeWidget.id, e.target.checked
+                                                    ? { updated_until: '' }
+                                                    : { updated_until: undefined, updated_label: undefined, updated_icon: undefined })}
+                                                className="h-4 w-4 accent-amber-500 cursor-pointer"
                                             />
-                                            <ReloadIntervalPicker widget={activeWidget} onChange={(v) => updateWidget(activeWidget.id, v)} />
-                                        </>
-                                    ) : (
-                                        <div className="space-y-1.5">
-                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Static Value</label>
-                                            <Input
-                                                value={activeWidget.metric_static_value || ''}
-                                                onChange={(e) => updateWidget(activeWidget.id, { metric_static_value: e.target.value })}
-                                                className="h-8 text-xs font-mono"
-                                                placeholder="0"
-                                            />
+                                            <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2">
+                                                <Sparkles className="w-3 h-3 text-amber-500" /> Mark update expired
+                                            </span>
+                                        </label>
+
+                                        {activeWidget.updated_until !== undefined && (
+                                            <div className="space-y-4 pt-1">
+                                                <div className="space-y-2">
+                                                    <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Expires on</label>
+                                                    <Input
+                                                        type="date"
+                                                        value={activeWidget.updated_until}
+                                                        onChange={e => updateWidget(activeWidget.id, { updated_until: e.target.value })}
+                                                        // Click anywhere in the field opens the native picker; typing the
+                                                        // segments by hand still works because the input keeps focus.
+                                                        onClick={e => e.currentTarget.showPicker?.()}
+                                                        className="h-9 text-sm bg-muted/30 border border-border/50 rounded-md [color-scheme:dark] cursor-pointer"
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Badge text</label>
+                                                    <Input
+                                                        value={activeWidget.updated_label || ''}
+                                                        onChange={e => updateWidget(activeWidget.id, { updated_label: e.target.value || undefined })}
+                                                        placeholder={DEFAULT_UPDATED_LABEL}
+                                                        className="h-9 text-sm bg-muted/30 border border-border/50 rounded-md"
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Badge icon</label>
+                                                    <IconPicker
+                                                        value={activeWidget.updated_icon}
+                                                        onChange={(name) => updateWidget(activeWidget.id, { updated_icon: name })}
+                                                        defaultTitle="Default (sparkles)"
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Icon (shown on public page)</label>
+                                        <IconPicker
+                                            value={activeWidget.icon}
+                                            onChange={(name) => updateWidget(activeWidget.id, { icon: name })}
+                                            defaultTitle="Default (per type)"
+                                        />
+                                    </div>
+
+                                    {activeWidget.type === 'SECTION' && (
+                                        <div className="flex items-center justify-between p-5 bg-muted/20 rounded-md border border-border/40">
+                                            <div>
+                                                <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-1">Hide header</p>
+                                                <p className="text-xs font-medium text-muted-foreground leading-none">Keep only the frame — hide title &amp; description on the public page</p>
+                                            </div>
+                                            <button onClick={() => updateWidget(activeWidget.id, { hide_header: !activeWidget.hide_header })}
+                                                className={cn("w-12 h-6 rounded-full transition-all relative shrink-0 shadow-inner", activeWidget.hide_header ? "bg-primary" : "bg-muted-foreground/20")}>
+                                                <div className={cn("absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-200", activeWidget.hide_header ? "right-0.5" : "left-0.5")} />
+                                            </button>
                                         </div>
                                     )}
-                                </div>
-                            )}
 
-                            {activeWidget.type === 'GAUGE' && (
-                                <div className="space-y-6">
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div className="space-y-1.5">
-                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Label</label>
-                                            <Input value={activeWidget.metric_label || ''} onChange={(e) => updateWidget(activeWidget.id, { metric_label: e.target.value })} className="h-8 text-xs" placeholder="e.g. CPU" />
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Unit</label>
-                                            <Input value={activeWidget.metric_unit || ''} onChange={(e) => updateWidget(activeWidget.id, { metric_unit: e.target.value })} className="h-8 text-xs" placeholder="%" />
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div className="space-y-1.5">
-                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Min</label>
-                                            <Input type="number" value={activeWidget.gauge_min ?? ''} onChange={(e) => updateWidget(activeWidget.id, { gauge_min: e.target.value === '' ? undefined : Number(e.target.value) })} className="h-8 text-xs" placeholder="0" />
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Max</label>
-                                            <Input type="number" value={activeWidget.gauge_max ?? ''} onChange={(e) => updateWidget(activeWidget.id, { gauge_max: e.target.value === '' ? undefined : Number(e.target.value) })} className="h-8 text-xs" placeholder="100" />
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div className="space-y-1.5">
-                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Warn ≥</label>
-                                            <Input type="number" value={activeWidget.gauge_warn ?? ''} onChange={(e) => updateWidget(activeWidget.id, { gauge_warn: e.target.value === '' ? undefined : Number(e.target.value) })} className="h-8 text-xs" placeholder="70" />
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Crit ≥</label>
-                                            <Input type="number" value={activeWidget.gauge_crit ?? ''} onChange={(e) => updateWidget(activeWidget.id, { gauge_crit: e.target.value === '' ? undefined : Number(e.target.value) })} className="h-8 text-xs" placeholder="90" />
-                                        </div>
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Format</label>
-                                        <select value={activeWidget.metric_format || 'number'} onChange={(e) => updateWidget(activeWidget.id, { metric_format: e.target.value as PageWidget['metric_format'] })} className="h-8 px-2 w-full text-xs font-bold border border-border rounded-md bg-background text-foreground outline-none cursor-pointer">
-                                            <option value="number">Number</option><option value="percent">Percent (×100)</option><option value="currency">Currency</option>
-                                        </select>
-                                    </div>
-                                    <DataSourceToggle widget={activeWidget} onChange={(v) => updateWidget(activeWidget.id, v)} />
-                                    {activeWidget.data_source === 'dataset' ? (
-                                        <>
-                                            <DatasetSourceConfig value={activeWidget.dataset} onChange={(v) => updateWidget(activeWidget.id, { dataset: v })} slots={{ showGroupBy: false, showMetric: true, showFn: true, showLimit: false, showSort: false }} />
-                                            <ReloadIntervalPicker widget={activeWidget} onChange={(v) => updateWidget(activeWidget.id, v)} />
-                                        </>
-                                    ) : (
-                                        <div className="space-y-1.5">
-                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Static Value</label>
-                                            <Input value={activeWidget.metric_static_value || ''} onChange={(e) => updateWidget(activeWidget.id, { metric_static_value: e.target.value })} className="h-8 text-xs font-mono" placeholder="65" />
+                                    {activeWidget.type === 'LINK' && (
+                                        <div className="space-y-6">
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Style</label>
+                                                <ButtonStylePicker
+                                                    presets={BUTTON_STYLES}
+                                                    value={activeWidget.style || ''}
+                                                    onChange={(val) => updateWidget(activeWidget.id, { style: val })}
+                                                />
+                                            </div>
+                                            <div className="flex items-center justify-between p-5 bg-muted/20 rounded-md border border-border/40">
+                                                <div>
+                                                    <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-1">Open in new tab</p>
+                                                    <p className="text-xs font-medium text-muted-foreground leading-none">Launch link in a separate window</p>
+                                                </div>
+                                                <button onClick={() => updateWidget(activeWidget.id, { new_tab: !activeWidget.new_tab })}
+                                                    className={cn("w-12 h-6 rounded-full transition-all relative shrink-0 shadow-inner", activeWidget.new_tab ? "bg-primary" : "bg-muted-foreground/20")}>
+                                                    <div className={cn("absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-200", activeWidget.new_tab ? "right-0.5" : "left-0.5")} />
+                                                </button>
+                                            </div>
                                         </div>
                                     )}
-                                </div>
-                            )}
 
-                            {activeWidget.type === 'PROGRESS' && (
-                                <div className="space-y-6">
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div className="space-y-1.5">
-                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Label</label>
-                                            <Input value={activeWidget.metric_label || ''} onChange={(e) => updateWidget(activeWidget.id, { metric_label: e.target.value })} className="h-8 text-xs" placeholder="e.g. Quota" />
+                                    {activeWidget.type === 'ENDPOINT' && (
+                                        <div className="space-y-6">
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Style</label>
+                                                <ButtonStylePicker
+                                                    presets={BUTTON_STYLES}
+                                                    value={activeWidget.style || 'premium-gradient'}
+                                                    onChange={(val) => updateWidget(activeWidget.id, { style: val })}
+                                                />
+                                            </div>
+                                            <div className="flex items-center justify-between p-5 bg-muted/20 rounded-md border border-border/40">
+                                                <div>
+                                                    <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-1">Execution Trace</p>
+                                                    <p className="text-xs font-medium text-muted-foreground leading-none">Show live logs after triggering</p>
+                                                </div>
+                                                <button onClick={() => updateWidget(activeWidget.id, { show_log: !activeWidget.show_log })}
+                                                    className={cn("w-12 h-6 rounded-full transition-all relative shrink-0 shadow-inner", activeWidget.show_log ? "bg-primary" : "bg-muted-foreground/20")}>
+                                                    <div className={cn("absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-200", activeWidget.show_log ? "right-0.5" : "left-0.5")} />
+                                                </button>
+                                            </div>
+                                            <div className="flex items-center justify-between p-5 bg-muted/20 rounded-md border border-border/40">
+                                                <div>
+                                                    <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-1">Allow Scheduling</p>
+                                                    <p className="text-xs font-medium text-muted-foreground leading-none">Show a "Schedule" button on the public page (one-time or daily-recurring)</p>
+                                                </div>
+                                                <button onClick={() => updateWidget(activeWidget.id, { allow_schedule: !activeWidget.allow_schedule })}
+                                                    className={cn("w-12 h-6 rounded-full transition-all relative shrink-0 shadow-inner", activeWidget.allow_schedule ? "bg-primary" : "bg-muted-foreground/20")}>
+                                                    <div className={cn("absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-200", activeWidget.allow_schedule ? "right-0.5" : "left-0.5")} />
+                                                </button>
+                                            </div>
                                         </div>
-                                        <div className="space-y-1.5">
-                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Unit</label>
-                                            <Input value={activeWidget.metric_unit || ''} onChange={(e) => updateWidget(activeWidget.id, { metric_unit: e.target.value })} className="h-8 text-xs" placeholder="GB" />
+                                    )}
+
+                                    {activeWidget.type === 'IMAGE' && activeWidget.image_url && (
+                                        <div className="rounded-md overflow-hidden border border-border/50 bg-muted/20">
+                                            <img src={activeWidget.image_url} alt={activeWidget.alt_text || ''} className="w-full h-auto max-h-48 object-contain" onError={e => (e.currentTarget.style.display = 'none')} />
                                         </div>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-3">
+                                    )}
+
+                                    {activeWidget.type === 'IFRAME' && (
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Height (px)</label>
+                                            <Input type="number" value={activeWidget.iframe_height || 400} onChange={e => updateWidget(activeWidget.id, { iframe_height: parseInt(e.target.value) || 400 })} className="h-9 text-sm bg-muted/30 border border-border/50 rounded-md" min={100} max={2000} />
+                                        </div>
+                                    )}
+
+                                    {activeWidget.type === 'CHART' && (
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1 flex items-center gap-2">
+                                                <BarChart3 className="w-3 h-3 text-cyan-500" /> Chart Type
+                                            </label>
+                                            <div className="grid grid-cols-4 gap-1">
+                                                {(['bar', 'line', 'pie', 'area'] as const).map(k => (
+                                                    <button key={k} type="button"
+                                                        onClick={() => updateWidget(activeWidget.id, { chart_kind: k })}
+                                                        className={cn(
+                                                            'h-8 rounded-md text-[10px] font-black uppercase tracking-widest transition-colors border',
+                                                            (activeWidget.chart_kind || 'bar') === k
+                                                                ? 'bg-cyan-500 text-white border-cyan-500'
+                                                                : 'bg-background text-muted-foreground border-border hover:bg-muted'
+                                                        )}>
+                                                        {k}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {activeWidget.type === 'GAUGE' && (
+                                        <>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Min</label>
+                                                    <Input type="number" value={activeWidget.gauge_min ?? ''} onChange={(e) => updateWidget(activeWidget.id, { gauge_min: e.target.value === '' ? undefined : Number(e.target.value) })} className="h-8 text-xs" placeholder="0" />
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Max</label>
+                                                    <Input type="number" value={activeWidget.gauge_max ?? ''} onChange={(e) => updateWidget(activeWidget.id, { gauge_max: e.target.value === '' ? undefined : Number(e.target.value) })} className="h-8 text-xs" placeholder="100" />
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Warn ≥</label>
+                                                    <Input type="number" value={activeWidget.gauge_warn ?? ''} onChange={(e) => updateWidget(activeWidget.id, { gauge_warn: e.target.value === '' ? undefined : Number(e.target.value) })} className="h-8 text-xs" placeholder="70" />
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Crit ≥</label>
+                                                    <Input type="number" value={activeWidget.gauge_crit ?? ''} onChange={(e) => updateWidget(activeWidget.id, { gauge_crit: e.target.value === '' ? undefined : Number(e.target.value) })} className="h-8 text-xs" placeholder="90" />
+                                                </div>
+                                            </div>
+                                        </>
+                                    )}
+
+                                    {activeWidget.type === 'PROGRESS' && (
                                         <div className="space-y-1.5">
                                             <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Target</label>
                                             <Input type="number" value={activeWidget.progress_target ?? ''} onChange={(e) => updateWidget(activeWidget.id, { progress_target: e.target.value === '' ? undefined : Number(e.target.value) })} className="h-8 text-xs" placeholder="100" />
                                         </div>
+                                    )}
+
+                                    {(activeWidget.type === 'METRIC' || activeWidget.type === 'GAUGE' || activeWidget.type === 'PROGRESS' || activeWidget.type === 'STAT_GRID' || activeWidget.type === 'SPARKLINE') && (
                                         <div className="space-y-1.5">
                                             <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Format</label>
-                                            <select value={activeWidget.metric_format || 'number'} onChange={(e) => updateWidget(activeWidget.id, { metric_format: e.target.value as PageWidget['metric_format'] })} className="h-8 px-2 w-full text-xs font-bold border border-border rounded-md bg-background text-foreground outline-none cursor-pointer">
-                                                <option value="number">Number</option><option value="percent">Percent (×100)</option><option value="currency">Currency</option>
+                                            <select
+                                                value={activeWidget.metric_format || 'number'}
+                                                onChange={(e) => updateWidget(activeWidget.id, { metric_format: e.target.value as PageWidget['metric_format'] })}
+                                                className="h-8 px-2 w-full text-xs font-bold border border-border rounded-md bg-background text-foreground outline-none cursor-pointer"
+                                            >
+                                                <option value="number">Number</option>
+                                                <option value="percent">Percent (×100)</option>
+                                                <option value="currency">Currency</option>
                                             </select>
                                         </div>
-                                    </div>
-                                    <DataSourceToggle widget={activeWidget} onChange={(v) => updateWidget(activeWidget.id, v)} />
-                                    {activeWidget.data_source === 'dataset' ? (
-                                        <>
-                                            <DatasetSourceConfig value={activeWidget.dataset} onChange={(v) => updateWidget(activeWidget.id, { dataset: v })} slots={{ showGroupBy: false, showMetric: true, showFn: true, showLimit: false, showSort: false }} />
-                                            <ReloadIntervalPicker widget={activeWidget} onChange={(v) => updateWidget(activeWidget.id, v)} />
-                                        </>
-                                    ) : (
-                                        <div className="space-y-1.5">
-                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Static Value</label>
-                                            <Input value={activeWidget.metric_static_value || ''} onChange={(e) => updateWidget(activeWidget.id, { metric_static_value: e.target.value })} className="h-8 text-xs font-mono" placeholder="40" />
-                                        </div>
                                     )}
                                 </div>
-                            )}
-
-                            {activeWidget.type === 'STAT_GRID' && (
-                                <div className="space-y-6">
-                                    <div className="space-y-1.5">
-                                        <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Format</label>
-                                        <select value={activeWidget.metric_format || 'number'} onChange={(e) => updateWidget(activeWidget.id, { metric_format: e.target.value as PageWidget['metric_format'] })} className="h-8 px-2 w-full text-xs font-bold border border-border rounded-md bg-background text-foreground outline-none cursor-pointer">
-                                            <option value="number">Number</option><option value="percent">Percent (×100)</option><option value="currency">Currency</option>
-                                        </select>
-                                    </div>
-                                    <DataSourceToggle widget={activeWidget} onChange={(v) => updateWidget(activeWidget.id, v)} />
-                                    {activeWidget.data_source === 'dataset' ? (
-                                        <>
-                                            <DatasetSourceConfig value={activeWidget.dataset} onChange={(v) => updateWidget(activeWidget.id, { dataset: v })} slots={{ showGroupBy: true, showMetric: true, showFn: true, showLimit: true, showSort: true }} />
-                                            <ReloadIntervalPicker widget={activeWidget} onChange={(v) => updateWidget(activeWidget.id, v)} />
-                                        </>
-                                    ) : (
-                                        <div className="space-y-1.5">
-                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Static Data (JSON [&#123;key,value&#125;])</label>
-                                            <textarea value={activeWidget.chart_static_data || ''} onChange={(e) => updateWidget(activeWidget.id, { chart_static_data: e.target.value })} rows={4} className="w-full px-3 py-2 text-xs font-mono border border-border rounded-md bg-background text-foreground outline-none" placeholder='[{"key":"OK","value":12}]' />
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            {activeWidget.type === 'SPARKLINE' && (
-                                <div className="space-y-6">
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div className="space-y-1.5">
-                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Label</label>
-                                            <Input value={activeWidget.metric_label || ''} onChange={(e) => updateWidget(activeWidget.id, { metric_label: e.target.value })} className="h-8 text-xs" placeholder="e.g. Requests" />
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Unit</label>
-                                            <Input value={activeWidget.metric_unit || ''} onChange={(e) => updateWidget(activeWidget.id, { metric_unit: e.target.value })} className="h-8 text-xs" placeholder="/min" />
-                                        </div>
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Format</label>
-                                        <select value={activeWidget.metric_format || 'number'} onChange={(e) => updateWidget(activeWidget.id, { metric_format: e.target.value as PageWidget['metric_format'] })} className="h-8 px-2 w-full text-xs font-bold border border-border rounded-md bg-background text-foreground outline-none cursor-pointer">
-                                            <option value="number">Number</option><option value="percent">Percent (×100)</option><option value="currency">Currency</option>
-                                        </select>
-                                    </div>
-                                    <DataSourceToggle widget={activeWidget} onChange={(v) => updateWidget(activeWidget.id, v)} />
-                                    {activeWidget.data_source === 'dataset' ? (
-                                        <>
-                                            <DatasetSourceConfig value={activeWidget.dataset} onChange={(v) => updateWidget(activeWidget.id, { dataset: v })} slots={{ showGroupBy: true, showMetric: true, showFn: true, showLimit: true, showSort: true }} />
-                                            <ReloadIntervalPicker widget={activeWidget} onChange={(v) => updateWidget(activeWidget.id, v)} />
-                                        </>
-                                    ) : (
-                                        <div className="space-y-1.5">
-                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Static Data (JSON [&#123;key,value&#125;])</label>
-                                            <textarea value={activeWidget.chart_static_data || ''} onChange={(e) => updateWidget(activeWidget.id, { chart_static_data: e.target.value })} rows={4} className="w-full px-3 py-2 text-xs font-mono border border-border rounded-md bg-background text-foreground outline-none" placeholder='[{"key":"Mon","value":10}]' />
-                                        </div>
-                                    )}
-                                </div>
-                            )}
+                            </div>
                         </div>
-                        <div className="px-8 py-6 bg-muted/10 border-t border-border/40 flex flex-col gap-3">
-                            <Button onClick={() => setEditingWidgetId(null)} className="premium-gradient text-white text-[10px] font-black uppercase tracking-[0.2em] h-9 rounded-md shadow-premium">
+                        <div className="px-6 py-4 bg-muted/10 border-t border-border/40 flex flex-row justify-center gap-2 shrink-0">
+                            <Button onClick={() => setEditingWidgetId(null)} className="premium-gradient text-white text-[10px] font-black uppercase tracking-[0.2em] h-9 px-8 rounded-md shadow-premium">
                                 Save Configuration
                             </Button>
-                            <Button variant="ghost" onClick={() => setEditingWidgetId(null)} className="h-8 text-[10px] font-black uppercase tracking-widest opacity-40 hover:opacity-100">Dismiss Settings</Button>
+                            <Button variant="outline" onClick={() => setEditingWidgetId(null)} className="h-9 px-6 text-[10px] font-black uppercase tracking-widest rounded-md">Dismiss Settings</Button>
                         </div>
                     </div>
                 </div>

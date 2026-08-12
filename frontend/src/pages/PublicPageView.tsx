@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import {
     Zap, Loader2, Monitor, Terminal, Clock, Sun, Moon, Copy, Check, Link2, Search,
-    FileText, ImageIcon, Frame, Activity, Table2, ArrowUp, Home, PanelLeftOpen
+    FileText, ImageIcon, Frame, Activity, Table2, ArrowUp, Home, PanelLeftOpen, Sparkles
 } from 'lucide-react';
 import { cn, copyToClipboard as clipboardCopy } from '../lib/utils';
 import { WidgetIcon } from '../lib/widgetIcons';
@@ -37,6 +37,17 @@ import ProgressWidget from '../components/public/ProgressWidget';
 import StatGridWidget from '../components/public/StatGridWidget';
 import SparklineWidget from '../components/public/SparklineWidget';
 import ParentSidebar from '../components/public/ParentSidebar';
+import { DEFAULT_UPDATED_LABEL, isUpdatedBadgeVisible, localDate } from '../lib/updatedBadge';
+
+// "Updated" flag shown on widgets whose updated_until window hasn't passed yet.
+const UpdatedBadge: React.FC<{ label?: string; icon?: string }> = ({ label, icon }) => (
+    <div className="absolute -top-2 -right-1 z-10 pointer-events-none">
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500 text-white text-[9px] font-black uppercase tracking-widest shadow-md">
+            <WidgetIcon name={icon} fallback={Sparkles} className="w-2.5 h-2.5" />
+            {label || DEFAULT_UPDATED_LABEL}
+        </span>
+    </div>
+);
 
 const PublicPageView = () => {
     const { slug } = useParams();
@@ -563,6 +574,12 @@ const PublicPageView = () => {
 
                     <div className="flex flex-wrap gap-x-[20px] gap-y-8 items-start">
                         {(() => {
+                            // Badge window is judged against the server's calendar date
+                            // (page.server_time carries the server's own offset), so a
+                            // visitor with a skewed clock sees the same thing everyone else does.
+                            const today = page?.server_time ? page.server_time.slice(0, 10) : localDate();
+                            const isUpdated = (widget: PageWidget) => isUpdatedBadgeVisible(widget, today);
+
                             const matchesSearch = (widget: PageWidget) => {
                                 if (!searchQuery) return true;
                                 const q = searchQuery.toLowerCase();
@@ -785,7 +802,8 @@ const PublicPageView = () => {
                                     const visibleChildren = children.filter(matchesSearch);
                                     if (!matchesSearch(widget) && visibleChildren.length === 0) return null;
                                     return (
-                                        <div key={widget.id} className={widthFor(widget)}>
+                                        <div key={widget.id} className={cn(widthFor(widget), 'relative')}>
+                                            {isUpdated(widget) && <UpdatedBadge label={widget.updated_label} icon={widget.updated_icon} />}
                                             {!widget.hide_header && (
                                                 <div className="pt-4 pb-3 border-b-2 border-border/50 mb-6">
                                                     <h2 className="text-2xl font-black flex items-center gap-2.5">
@@ -803,7 +821,8 @@ const PublicPageView = () => {
                                                         const body = renderWidgetBody(child);
                                                         if (!body) return null;
                                                         return (
-                                                            <div key={child.id} className={childWidthFor(child)}>
+                                                            <div key={child.id} className={cn(childWidthFor(child), 'relative')}>
+                                                                {isUpdated(child) && <UpdatedBadge label={child.updated_label} icon={child.updated_icon} />}
                                                                 {body}
                                                             </div>
                                                         );
@@ -817,7 +836,8 @@ const PublicPageView = () => {
                                 const body = renderWidgetBody(widget);
                                 if (!body) return null;
                                 return (
-                                    <div key={widget.id} className={widthFor(widget)}>
+                                    <div key={widget.id} className={cn(widthFor(widget), 'relative')}>
+                                        {isUpdated(widget) && <UpdatedBadge label={widget.updated_label} icon={widget.updated_icon} />}
                                         {body}
                                     </div>
                                 );

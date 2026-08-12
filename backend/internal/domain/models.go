@@ -681,6 +681,10 @@ type Page struct {
 	CreatedByUsername string         `json:"created_by_username,omitempty" gorm:"<-:create"`
 	CreatedAt         time.Time      `json:"created_at" gorm:"<-:create"`
 	UpdatedAt         time.Time      `json:"updated_at"`
+	// ServerTime is not persisted. Public responses stamp it so the browser can decide
+	// whether a widget's "updated" badge is still within its window using the server
+	// clock instead of the visitor's (possibly wrong) local clock.
+	ServerTime *time.Time `json:"server_time,omitempty" gorm:"-"`
 }
 
 type PageWorkflow struct {
