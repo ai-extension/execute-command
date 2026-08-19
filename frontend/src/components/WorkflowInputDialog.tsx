@@ -5,6 +5,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Zap } from 'lucide-react';
 import { generateUUID } from '../lib/utils';
 import { WorkflowInputFields, parseTemplateMap } from './WorkflowInputFields';
+import { DATE_TIME_PLACEHOLDER, DateTimeMode, getDateTimeMode, isValidDateTimeValue } from './DateTimeInput';
+import { parseMultiInputConfig } from '../lib/multiInput';
 
 interface WorkflowInputDialogProps {
     isOpen: boolean;
@@ -94,7 +96,7 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
                     initialValues[input.key] = '[]';
                 } else if (input.type === 'dataset-select') {
                     initialValues[input.key] = '';
-                } else if (input.type === 'input' || input.type === 'number' || input.type === 'textarea') {
+                } else if (input.type === 'input' || input.type === 'number' || input.type === 'textarea' || input.type === 'date' || input.type === 'time') {
                     const tm = parseTemplateMap(input.default_value);
                     initialValues[input.key] = tm ? '' : (input.default_value || '');
                 } else {
@@ -162,9 +164,25 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
                     newErrors[input.key] = 'Please add at least one row';
                     return;
                 }
+                // A row field declared as date/time is format-checked like a top-level
+                // date/time input; every other field keeps the character check.
+                const dateTimeFields = new Map<string, DateTimeMode>(
+                    parseMultiInputConfig(input.default_value)
+                        .filter(f => f.type === 'date' || f.type === 'time')
+                        .map(f => [f.key, getDateTimeMode(f.type, f.include_time)])
+                );
                 for (const row of rows) {
                     for (const k in row) {
-                        if (!safeRegex.test(String(row[k]))) {
+                        const rowVal = String(row[k] ?? '');
+                        const mode = dateTimeFields.get(k);
+                        if (mode) {
+                            if (rowVal.trim() !== '' && !isValidDateTimeValue(mode, rowVal)) {
+                                newErrors[input.key] = `${k} must be ${DATE_TIME_PLACEHOLDER[mode]}`;
+                                return;
+                            }
+                            continue;
+                        }
+                        if (!safeRegex.test(rowVal)) {
                             newErrors[input.key] = `Invalid characters in ${k}. Allowed: Letters, 0-9, _, -, ., /, \, :, [, ], {, }, ", ', @, #, %, !, +, =, ?, ;, &, |, Newline and Space`;
                             return;
                         }
@@ -176,6 +194,17 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
                     : !!files[input.key];
                 if (input.required && !hasValue) {
                     newErrors[input.key] = 'This field is required';
+                }
+            } else if (input.type === 'date' || input.type === 'time') {
+                // Same rule as the backend: an input value is never re-rendered as a
+                // template, so only a literal date/time is accepted here.
+                const mode = getDateTimeMode(input.type, input.include_time);
+                if (isValueEmpty) {
+                    if (input.required) {
+                        newErrors[input.key] = 'This field is required';
+                    }
+                } else if (!isValidDateTimeValue(mode, val)) {
+                    newErrors[input.key] = `Must be ${DATE_TIME_PLACEHOLDER[mode]}`;
                 }
             } else if (input.type === 'dataset-select') {
                 if (input.required && isValueEmpty) {

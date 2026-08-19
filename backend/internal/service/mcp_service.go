@@ -167,6 +167,9 @@ func (s *MCPService) handleListWorkflows(ctx context.Context, request mcp.CallTo
 					}
 				}
 				inputMap["options"] = options
+			} else if in.Type == "date" || in.Type == "time" {
+				// Tell the AI the exact string format a date/time input expects
+				inputMap["format"] = InputDateTimeFormatHint(in.Type, in.IncludeTime)
 			} else if in.Type == "multi-input" {
 				// Multi-input stores field definitions in DefaultValue as JSON
 				var fields []map[string]interface{}

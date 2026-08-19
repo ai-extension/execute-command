@@ -6,6 +6,8 @@ import { cn } from '../../lib/utils';
 import { API_BASE_URL } from '../../lib/api';
 import { WorkflowInput } from '../../types';
 import { WorkflowInputFields, parseTemplateMap } from '../WorkflowInputFields';
+import { DATE_TIME_PLACEHOLDER, getDateTimeMode, isValidDateTimeValue } from '../DateTimeInput';
+import { parseMultiInputConfig } from '../../lib/multiInput';
 
 const MAX_REPEAT_DAYS = 10;
 
@@ -169,6 +171,36 @@ const PublicScheduleDialog: React.FC<{
         if (missing.length > 0) {
             setError(`Fill required input(s): ${missing.map(m => m.label || m.key).join(', ')}`);
             return;
+        }
+
+        // A malformed date/time is only rejected by the backend when the schedule fires,
+        // long after this dialog closed — so catch it here while the visitor can fix it.
+        for (const inp of sortedInputs) {
+            if (inp.type === 'date' || inp.type === 'time') {
+                const val = values[inp.key] || '';
+                if (isInputEmpty(inp, val)) continue;
+                const mode = getDateTimeMode(inp.type, inp.include_time);
+                if (!isValidDateTimeValue(mode, val)) {
+                    setError(`${inp.label || inp.key} must be ${DATE_TIME_PLACEHOLDER[mode]}`);
+                    return;
+                }
+                continue;
+            }
+            if (inp.type !== 'multi-input') continue;
+            const dateTimeFields = parseMultiInputConfig(inp.default_value)
+                .filter(f => f.type === 'date' || f.type === 'time');
+            if (dateTimeFields.length === 0) continue;
+            for (const row of parseRows(values[inp.key] || '')) {
+                for (const f of dateTimeFields) {
+                    const rowVal = String(row[f.key] ?? '');
+                    if (rowVal.trim() === '') continue;
+                    const mode = getDateTimeMode(f.type, f.include_time);
+                    if (!isValidDateTimeValue(mode, rowVal)) {
+                        setError(`${inp.label || inp.key} — ${f.label || f.key} must be ${DATE_TIME_PLACEHOLDER[mode]}`);
+                        return;
+                    }
+                }
+            }
         }
 
         const days = Math.min(Math.max(1, repeatDays), MAX_REPEAT_DAYS);

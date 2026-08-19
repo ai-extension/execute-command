@@ -368,10 +368,11 @@ type WorkflowInput struct {
 	WorkflowID   uuid.UUID `json:"workflow_id" gorm:"type:uuid;index;constraint:OnDelete:CASCADE;"`
 	Key          string    `json:"key" gorm:"not null"`
 	Label        string    `json:"label" gorm:"not null"`
-	Type         string    `json:"type" gorm:"not null;default:'input'"` // input, number, select, multi-select, multi-input, file, dataset-select, dataset-multi-select
+	Type         string    `json:"type" gorm:"not null;default:'input'"` // input, number, select, multi-select, multi-input, file, dataset-select, dataset-multi-select, date, time
 	DefaultValue      string    `json:"default_value"`
 	CollapseInitially bool      `json:"collapse_initially" gorm:"default:false"`
 	AllowFolder       bool      `json:"allow_folder" gorm:"default:false"` // type=file only: let users pick an entire folder (structure preserved)
+	IncludeTime       bool      `json:"include_time" gorm:"default:false"` // type=date only: pick a date AND a time (value becomes YYYY-MM-DDTHH:MM)
 	Required          bool      `json:"required" gorm:"default:false"`
 	Order        int       `json:"order" gorm:"default:0"`
 	CreatedAt    time.Time `json:"created_at" gorm:"<-:create"`

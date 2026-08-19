@@ -13,6 +13,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useNamespace } from '../../context/NamespaceContext';
 import { API_BASE_URL } from '../../lib/api';
 import { DatasetInputConfig, parseDatasetInputConfig, serializeDatasetInputConfig } from '../../lib/datasetInput';
+import { DateTimeInput, DATE_TIME_PLACEHOLDER, convertDateTimeValue, getDateTimeMode } from '../DateTimeInput';
 
 const parseDsColumns = (raw?: string): string[] => {
     if (!raw) return [];
@@ -238,11 +239,30 @@ const MultiInputConfigEditor: React.FC<{
                                                             <option value="input">Input</option>
                                                             <option value="number">Number</option>
                                                             <option value="select">Select</option>
+                                                            <option value="date">Date</option>
+                                                            <option value="time">Time</option>
                                                             <option value="file">File Upload</option>
                                                         </select>
                                                     </div>
                                                 </div>
                                             </div>
+
+                                            {item.type === 'date' && (
+                                                <div className="border-t border-border/20 animate-in fade-in slide-in-from-top-1 duration-200 mt-3 pt-3 ml-7 flex items-center justify-between">
+                                                    <div className="space-y-0.5">
+                                                        <label className="text-[10px] font-black uppercase tracking-widest text-primary/70">Include time</label>
+                                                        <p className="text-[10px] text-muted-foreground">Also pick a time (value becomes YYYY-MM-DDTHH:MM)</p>
+                                                    </div>
+                                                    <Switch
+                                                        checked={item.include_time || false}
+                                                        onCheckedChange={(val) => {
+                                                            const ni = [...items];
+                                                            ni[i].include_time = val;
+                                                            updateItems(ni);
+                                                        }}
+                                                    />
+                                                </div>
+                                            )}
 
                                             {item.type === 'select' && (
                                                 <div className=" border-t border-border/20 space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200 mt-3 pt-3 ml-7">
@@ -441,6 +461,8 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
                                                                         <option value="select">Select</option>
                                                                         <option value="multi-select">Multi-Select</option>
                                                                         <option value="multi-input">Multi-Input</option>
+                                                                        <option value="date">Date</option>
+                                                                        <option value="time">Time</option>
                                                                         <option value="file">File Upload</option>
                                                                         <option value="dataset-select">Dataset Record</option>
                                                                         <option value="dataset-multi-select">Dataset Records (Multi)</option>
@@ -451,6 +473,7 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
                                                                         {input.type === 'select' || input.type === 'multi-select' ? 'Options (comma-separated)'
                                                                             : input.type === 'multi-input' ? 'Configure Fields for Rows'
                                                                                 : input.type === 'file' ? ''
+                                                                                : input.type === 'date' || input.type === 'time' ? `Default Value (${DATE_TIME_PLACEHOLDER[getDateTimeMode(input.type, input.include_time)]})`
                                                                                     : input.type === 'dataset-select' || input.type === 'dataset-multi-select' ? 'Dataset Configuration'
                                                                                         : 'Default Value'}
                                                                     </label>
@@ -507,6 +530,38 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
                                                                                     setInputs(ni);
                                                                                 }}
                                                                             />
+                                                                        </div>
+                                                                    ) : input.type === 'date' || input.type === 'time' ? (
+                                                                        <div className="space-y-2">
+                                                                            <DateTimeInput
+                                                                                mode={getDateTimeMode(input.type, input.include_time)}
+                                                                                value={input.default_value || ''}
+                                                                                onChange={(val) => {
+                                                                                    const ni = [...inputs];
+                                                                                    ni[idx].default_value = val;
+                                                                                    setInputs(ni);
+                                                                                }}
+                                                                                className="h-8 text-xs"
+                                                                            />
+                                                                            {input.type === 'date' && (
+                                                                                <div className="flex items-center justify-between bg-muted/20 p-2 rounded-md border border-border/50">
+                                                                                    <div className="space-y-0.5">
+                                                                                        <label className="text-[10px] font-black uppercase tracking-widest text-primary">Include time</label>
+                                                                                        <p className="text-[10px] text-muted-foreground">Also pick a time (value becomes YYYY-MM-DDTHH:MM)</p>
+                                                                                    </div>
+                                                                                    <Switch
+                                                                                        checked={input.include_time || false}
+                                                                                        onCheckedChange={(val) => {
+                                                                                            const ni = [...inputs];
+                                                                                            ni[idx].include_time = val;
+                                                                                            // Keep the day already picked: convert the default to the new
+                                                                                            // format instead of shipping a value the run dialog rejects.
+                                                                                            ni[idx].default_value = convertDateTimeValue(ni[idx].default_value || '', val ? 'datetime' : 'date');
+                                                                                            setInputs(ni);
+                                                                                        }}
+                                                                                    />
+                                                                                </div>
+                                                                            )}
                                                                         </div>
                                                                     ) : input.type === 'input' ? (
                                                                         <Textarea

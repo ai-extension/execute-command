@@ -231,8 +231,10 @@ export interface MultiInputItem {
     id: string;
     key: string;
     label: string;
-    type: 'input' | 'number' | 'select' | 'file';
+    type: 'input' | 'number' | 'select' | 'file' | 'date' | 'time';
     options?: string; // Comma separated for select type
+    // type=date only: pick a date AND a time (value becomes YYYY-MM-DDTHH:MM).
+    include_time?: boolean;
 }
 
 export interface WorkflowInput {
@@ -240,10 +242,12 @@ export interface WorkflowInput {
     workflow_id: string;
     key: string;
     label: string;
-    type: 'input' | 'textarea' | 'number' | 'select' | 'multi-select' | 'multi-input' | 'file' | 'dataset-select' | 'dataset-multi-select';
+    type: 'input' | 'textarea' | 'number' | 'select' | 'multi-select' | 'multi-input' | 'file' | 'dataset-select' | 'dataset-multi-select' | 'date' | 'time';
     default_value: string;
     collapse_initially?: boolean;
     allow_folder?: boolean;
+    // type=date only: pick a date AND a time (value becomes YYYY-MM-DDTHH:MM).
+    include_time?: boolean;
     required: boolean;
     order?: number;
     created_at: string;

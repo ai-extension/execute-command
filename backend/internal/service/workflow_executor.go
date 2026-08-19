@@ -938,10 +938,19 @@ func (e *WorkflowExecutor) validateInputs(wf *domain.Workflow, provided map[stri
 					}
 				}
 			} else {
+				// A row field declared as date/time is format-checked like a top-level
+				// date/time input; every other field keeps the character check.
+				dateTimeFields := multiInputDateTimeFields(input.DefaultValue)
 				for _, row := range rows {
 					for k, v := range row {
 						strV := fmt.Sprintf("%v", v)
 						if strV == "" {
+							continue
+						}
+						if cfg, ok := dateTimeFields[k]; ok {
+							if _, err := ParseInputDateTime(cfg.Type, cfg.IncludeTime, strV); err != nil {
+								return fmt.Errorf("field %s: '%s' must be %s (got: %s)", input.Label, k, InputDateTimeFormatHint(cfg.Type, cfg.IncludeTime), strV)
+							}
 							continue
 						}
 						if !SecurityRegex.MatchString(strV) {
@@ -949,6 +958,15 @@ func (e *WorkflowExecutor) validateInputs(wf *domain.Workflow, provided map[stri
 						}
 					}
 				}
+			}
+		case "date", "time":
+			// Values come from a native picker or are typed by hand, so the format is
+			// checked here. An input's own value is never re-rendered as a template
+			// (a parent workflow resolves the values it maps before the child runs —
+			// see runWorkflowStep/triggerHooks), so a literal format is the only thing
+			// that can reach a command: reject anything else instead of passing it on.
+			if _, err := ParseInputDateTime(input.Type, input.IncludeTime, val); err != nil {
+				return fmt.Errorf("field %s must be %s (got: %s)", input.Label, InputDateTimeFormatHint(input.Type, input.IncludeTime), val)
 			}
 		case "file":
 			continue // the backend generated path is inherently safe (absolute path)
@@ -959,6 +977,88 @@ func (e *WorkflowExecutor) validateInputs(wf *domain.Workflow, provided map[stri
 		}
 	}
 	return nil
+}
+
+// Layouts accepted for a date/time input value. The native pickers emit the first
+// layout of each set; the extra ones cover values typed by hand (seconds, or a space
+// instead of the ISO "T" separator).
+var (
+	inputDateLayouts     = []string{"2006-01-02"}
+	inputDateTimeLayouts = []string{"2006-01-02T15:04", "2006-01-02T15:04:05", "2006-01-02 15:04", "2006-01-02 15:04:05"}
+	inputTimeLayouts     = []string{"15:04", "15:04:05"}
+)
+
+func inputDateTimeLayoutsFor(inputType string, includeTime bool) []string {
+	if inputType == "time" {
+		return inputTimeLayouts
+	}
+	if includeTime {
+		return inputDateTimeLayouts
+	}
+	return inputDateLayouts
+}
+
+// ParseInputDateTime validates a date/time input value against the layouts allowed for
+// its type, and returns the parsed value.
+func ParseInputDateTime(inputType string, includeTime bool, val string) (time.Time, error) {
+	trimmed := strings.TrimSpace(val)
+	var lastErr error
+	for _, layout := range inputDateTimeLayoutsFor(inputType, includeTime) {
+		t, err := time.Parse(layout, trimmed)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		// time.Parse accepts a non-padded number where the layout has a padded one
+		// ("7:30" for "15:04"), which the frontend rejects. Round-trip the parsed value
+		// so both sides agree on one exact format.
+		if t.Format(layout) != trimmed {
+			lastErr = fmt.Errorf("value %q does not match layout %q", trimmed, layout)
+			continue
+		}
+		return t, nil
+	}
+	return time.Time{}, lastErr
+}
+
+// MultiInputFieldConfig is one row-field definition of a multi-input, stored as JSON in
+// the input's DefaultValue by the workflow designer.
+type MultiInputFieldConfig struct {
+	Key         string `json:"key"`
+	Type        string `json:"type"`
+	IncludeTime bool   `json:"include_time"`
+}
+
+// multiInputDateTimeFields returns the date/time row fields of a multi-input, keyed by
+// field key. A DefaultValue that is not the JSON field list (legacy comma-separated
+// keys) has no typed fields, so it yields an empty map.
+func multiInputDateTimeFields(defaultValue string) map[string]MultiInputFieldConfig {
+	result := map[string]MultiInputFieldConfig{}
+	var fields []MultiInputFieldConfig
+	if err := json.Unmarshal([]byte(defaultValue), &fields); err != nil {
+		return result
+	}
+	for _, f := range fields {
+		if f.Key == "" {
+			continue
+		}
+		if f.Type == "date" || f.Type == "time" {
+			result[f.Key] = f
+		}
+	}
+	return result
+}
+
+// InputDateTimeFormatHint is the human/AI readable format of a date/time input.
+func InputDateTimeFormatHint(inputType string, includeTime bool) string {
+	switch {
+	case inputType == "time":
+		return "HH:MM"
+	case includeTime:
+		return "YYYY-MM-DDTHH:MM"
+	default:
+		return "YYYY-MM-DD"
+	}
 }
 
 func (e *WorkflowExecutor) evaluateCondition(condition string, inputs map[string]string, variables []domain.WorkflowVariable, flowData map[string]interface{}, namespaceID uuid.UUID, user *domain.User, execID uuid.UUID) (bool, error) {

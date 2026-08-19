@@ -5,10 +5,11 @@ import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
 import { Plus, Trash2 } from 'lucide-react';
-import { generateUUID } from '../lib/utils';
 import { SearchableSelect } from './SearchableSelect';
 import { DatasetRecordPicker } from './DatasetRecordPicker';
 import { parseDatasetInputConfig } from '../lib/datasetInput';
+import { DateTimeInput, getDateTimeMode } from './DateTimeInput';
+import { parseMultiInputConfig } from '../lib/multiInput';
 
 // Shared rendering for a workflow's input fields, used by both the run-flow
 // WorkflowInputDialog and the public PublicScheduleDialog so both dialogs stay
@@ -238,18 +239,7 @@ export const WorkflowInputFields: React.FC<WorkflowInputFieldsProps> = ({
                                     try { rows = JSON.parse(values[input.key] || '[]'); } catch (e) { rows = []; }
                                     if (!Array.isArray(rows)) rows = [];
 
-                                    let config: MultiInputItem[] = [];
-                                    try {
-                                        config = JSON.parse(input.default_value || '[]');
-                                        if (!Array.isArray(config)) throw new Error();
-                                    } catch (e) {
-                                        config = (input.default_value || '').split(',').map(k => ({
-                                            id: generateUUID(),
-                                            key: k.trim(),
-                                            label: k.trim(),
-                                            type: 'input' as const
-                                        })).filter(c => c.key);
-                                    }
+                                    const config: MultiInputItem[] = parseMultiInputConfig(input.default_value);
 
                                     return (
                                         <>
@@ -270,6 +260,13 @@ export const WorkflowInputFields: React.FC<WorkflowInputFieldsProps> = ({
                                                                         searchPlaceholder="Search..."
                                                                         isSearchable
                                                                         triggerClassName="h-8 rounded-md bg-muted/30"
+                                                                    />
+                                                                ) : (field.type === 'date' || field.type === 'time') ? (
+                                                                    <DateTimeInput
+                                                                        mode={getDateTimeMode(field.type, field.include_time)}
+                                                                        value={row[field.key] || ''}
+                                                                        onChange={(val) => setValues({ ...values, [input.key]: updateMultiInputValue(values[input.key], rowIndex, field.key, val) })}
+                                                                        className="h-8 bg-muted/30"
                                                                     />
                                                                 ) : (field.type === 'file' && !richFallback) ? (
                                                                     <Input
@@ -352,6 +349,13 @@ export const WorkflowInputFields: React.FC<WorkflowInputFieldsProps> = ({
                                 rows={5}
                                 className={`px-3 py-2 bg-background focus:border-indigo-500 text-[11px] font-semibold rounded-lg transition-all resize-y ${err[input.key] ? 'border-destructive' : 'border-border'}`}
                                 placeholder={`Select ${templateMaps[input.key]._template_for} to auto-fill template...`}
+                            />
+                        ) : (input.type === 'date' || input.type === 'time') ? (
+                            <DateTimeInput
+                                mode={getDateTimeMode(input.type, input.include_time)}
+                                value={values[input.key] || ''}
+                                onChange={(val) => setVal(input.key, val)}
+                                hasError={!!err[input.key]}
                             />
                         ) : input.type === 'textarea' ? (
                             <Textarea

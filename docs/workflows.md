@@ -44,8 +44,21 @@ Inputs collect parameters from the user before a workflow starts. Every input is
 | **`number`** | Numeric box | int / float | Counts, ports |
 | **`select`** | Dropdown | string | Pre-defined choices |
 | **`multi-select`** | Tag input | string[] | Multi-pick options |
-| **`multi-input`** | Dynamic list | string[] | Variable-length lists |
+| **`multi-input`** | Dynamic list | string[] | Variable-length lists (row fields: `input` / `number` / `select` / `date` / `time` / `file`) |
 | **`file`** | File picker | local path string | Scripts, configs, binaries |
+| **`date`** | Text box + date picker | `YYYY-MM-DD` (or `YYYY-MM-DDTHH:MM` with *Include time* on) | Backup dates, cut-off dates, maintenance windows |
+| **`time`** | Text box + time picker | `HH:MM` | Run-at times, schedule hours |
+
+A `date` / `time` value can be typed or pasted as one string, and the browser picker opens from the calendar / clock
+icon or from the click that focuses the field (later clicks only move the caret, so an edit in progress is never cut
+off). The value must be a real date/time in the format above (a space separator and seconds are accepted too, e.g.
+`2026-08-19 14:30:00`), and a template such as `{{ my_var }}` is **rejected**: an
+input's own value is never re-rendered, so only a literal value can reach a command. (A parent workflow mapping
+`{{ ... }}` onto a sub-workflow's date input still works — the parent resolves it before the child runs.)
+
+A `multi-input` row field can be a `date` / `time` too (same *Include time* switch, same value format). Each row
+value is validated per field; a legacy comma-separated field list declares no field types, so its values are only
+character-checked.
 
 ### Input metadata
 - **Required** — block the run if empty.
