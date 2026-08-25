@@ -5,6 +5,37 @@ import { cn } from '../../lib/utils';
 import AnsiText from '../AnsiText';
 import { API_BASE_URL } from '../../lib/api';
 
+const TERMINAL_SIZE_STORAGE_KEY = 'publicPage:terminal:size';
+const MIN_TERMINAL_WIDTH = 280;
+const MIN_TERMINAL_HEIGHT = 160;
+
+const clampSize = (width: number, height: number) => ({
+    width: Math.min(Math.max(MIN_TERMINAL_WIDTH, width), window.innerWidth - 16),
+    height: Math.min(Math.max(MIN_TERMINAL_HEIGHT, height), window.innerHeight - 16),
+});
+
+// The terminal unmounts between runs, so the last size the user dragged to is kept in
+// localStorage and re-applied to every terminal opened afterwards.
+const readStoredSize = (): { width: number; height: number } | null => {
+    try {
+        const raw = localStorage.getItem(TERMINAL_SIZE_STORAGE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (typeof parsed?.width !== 'number' || typeof parsed?.height !== 'number') return null;
+        return clampSize(parsed.width, parsed.height);
+    } catch {
+        return null;
+    }
+};
+
+const writeStoredSize = (width: number, height: number) => {
+    try {
+        localStorage.setItem(TERMINAL_SIZE_STORAGE_KEY, JSON.stringify({ width, height }));
+    } catch {
+        /* storage unavailable (private mode / quota) - size just won't persist */
+    }
+};
+
 interface PageExecutionTerminalProps {
     activeExecutionId: string | null;
     workflowId?: string;
@@ -36,9 +67,9 @@ const PageExecutionTerminal: React.FC<PageExecutionTerminalProps> = ({
     useEffect(() => { onStatusChangeRef.current = onStatusChange; });
 
     const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
-    const [size, setSize] = useState<{ width: number; height: number } | null>(null);
+    const [size, setSize] = useState<{ width: number; height: number } | null>(() => readStoredSize());
     const dragState = useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
-    const resizeState = useRef<{ startX: number; startY: number; originW: number; originH: number } | null>(null);
+    const resizeState = useRef<{ startX: number; startY: number; originW: number; originH: number; axis: 'both' | 'x' | 'y' } | null>(null);
 
     const onHeaderMouseDown = (e: React.MouseEvent) => {
         if (terminalState === 'maximized') return;
@@ -67,14 +98,20 @@ const PageExecutionTerminal: React.FC<PageExecutionTerminalProps> = ({
                 const ny = Math.min(Math.max(0, dragState.current.originY + dy), window.innerHeight - h);
                 setPosition({ x: nx, y: ny });
             } else if (resizeState.current) {
-                const dx = e.clientX - resizeState.current.startX;
-                const dy = e.clientY - resizeState.current.startY;
-                const nw = Math.min(Math.max(280, resizeState.current.originW + dx), window.innerWidth - 16);
-                const nh = Math.min(Math.max(160, resizeState.current.originH + dy), window.innerHeight - 16);
-                setSize({ width: nw, height: nh });
+                const { axis, originW, originH, startX, startY } = resizeState.current;
+                const dx = axis === 'y' ? 0 : e.clientX - startX;
+                const dy = axis === 'x' ? 0 : e.clientY - startY;
+                setSize(clampSize(originW + dx, originH + dy));
             }
         };
-        const onUp = () => { dragState.current = null; resizeState.current = null; };
+        const onUp = () => {
+            if (resizeState.current) {
+                const rect = containerRef.current?.getBoundingClientRect();
+                if (rect) writeStoredSize(rect.width, rect.height);
+            }
+            dragState.current = null;
+            resizeState.current = null;
+        };
         window.addEventListener('mousemove', onMove);
         window.addEventListener('mouseup', onUp);
         return () => {
@@ -84,10 +121,10 @@ const PageExecutionTerminal: React.FC<PageExecutionTerminalProps> = ({
     }, []);
 
     useEffect(() => {
-        if (terminalState === 'maximized') { setPosition(null); setSize(null); }
+        if (terminalState === 'maximized') { setPosition(null); setSize(readStoredSize()); }
     }, [terminalState]);
 
-    const onResizeMouseDown = (e: React.MouseEvent) => {
+    const startResize = (axis: 'both' | 'x' | 'y') => (e: React.MouseEvent) => {
         if (terminalState !== 'normal') return;
         const rect = containerRef.current?.getBoundingClientRect();
         if (!rect) return;
@@ -97,6 +134,7 @@ const PageExecutionTerminal: React.FC<PageExecutionTerminalProps> = ({
             startY: e.clientY,
             originW: rect.width,
             originH: rect.height,
+            axis,
         };
         e.preventDefault();
         e.stopPropagation();
@@ -198,27 +236,37 @@ const PageExecutionTerminal: React.FC<PageExecutionTerminalProps> = ({
                     )}>
                     <div className="flex items-center gap-3">
                         {/* Traffic Light Controls */}
-                        <div className="flex gap-1 mr-2">
+                        {/* Traffic lights keep their small dot look but sit inside a 28px
+                            padded button so they are comfortable to hit. */}
+                        <div className="flex items-center -ml-1.5 mr-1">
                             <button
                                 onClick={onClose}
-                                className="w-2.5 h-2.5 rounded-full bg-[#ff5f56] border border-[#e0443e] hover:bg-[#ff5f56]/80 transition-all flex items-center justify-center group/btn"
+                                title="Close"
+                                className="p-2 rounded-md hover:bg-white/10 transition-all flex items-center justify-center group/btn"
                             >
-                                <X className="w-1.5 h-1.5 text-black opacity-0 group-hover/btn:opacity-100" />
+                                <span className="w-3 h-3 rounded-full bg-[#ff5f56] border border-[#e0443e] group-hover/btn:bg-[#ff5f56]/80 flex items-center justify-center">
+                                    <X className="w-2 h-2 text-black opacity-0 group-hover/btn:opacity-100" />
+                                </span>
                             </button>
                             <button
                                 onClick={toggleMinimize}
                                 title={terminalState === 'minimized' ? 'Restore' : 'Minimize'}
-                                className="w-2.5 h-2.5 rounded-full bg-[#ffbd2e] border border-[#dea123] hover:bg-[#ffbd2e]/80 transition-all flex items-center justify-center group/btn"
+                                className="p-2 rounded-md hover:bg-white/10 transition-all flex items-center justify-center group/btn"
                             >
-                                {terminalState === 'minimized'
-                                    ? <ChevronUp className="w-1.5 h-1.5 text-black opacity-0 group-hover/btn:opacity-100" />
-                                    : <ChevronDown className="w-1.5 h-1.5 text-black opacity-0 group-hover/btn:opacity-100" />}
+                                <span className="w-3 h-3 rounded-full bg-[#ffbd2e] border border-[#dea123] group-hover/btn:bg-[#ffbd2e]/80 flex items-center justify-center">
+                                    {terminalState === 'minimized'
+                                        ? <ChevronUp className="w-2 h-2 text-black opacity-0 group-hover/btn:opacity-100" />
+                                        : <ChevronDown className="w-2 h-2 text-black opacity-0 group-hover/btn:opacity-100" />}
+                                </span>
                             </button>
                             <button
                                 onClick={() => setTerminalState(terminalState === 'maximized' ? 'normal' : 'maximized')}
-                                className="w-2.5 h-2.5 rounded-full bg-[#27c93f] border border-[#1aab29] hover:bg-[#27c93f]/80 transition-all flex items-center justify-center group/btn"
+                                title={terminalState === 'maximized' ? 'Restore' : 'Maximize'}
+                                className="p-2 rounded-md hover:bg-white/10 transition-all flex items-center justify-center group/btn"
                             >
-                                <Maximize2 className="w-1.5 h-1.5 text-black opacity-0 group-hover/btn:opacity-100" />
+                                <span className="w-3 h-3 rounded-full bg-[#27c93f] border border-[#1aab29] group-hover/btn:bg-[#27c93f]/80 flex items-center justify-center">
+                                    <Maximize2 className="w-2 h-2 text-black opacity-0 group-hover/btn:opacity-100" />
+                                </span>
                             </button>
                         </div>
                         <div className="flex items-center gap-2" onClick={() => terminalState === 'minimized' && setTerminalState('normal')}>
@@ -251,14 +299,30 @@ const PageExecutionTerminal: React.FC<PageExecutionTerminalProps> = ({
                 )}
             </div>
             {terminalState === 'normal' && (
-                <div
-                    onMouseDown={onResizeMouseDown}
-                    title="Resize"
-                    className="absolute bottom-1 right-1 w-4 h-4 cursor-nwse-resize text-zinc-400 hover:text-zinc-200 z-20"
-                    style={{
-                        backgroundImage: 'linear-gradient(135deg, transparent 55%, currentColor 55%, currentColor 65%, transparent 65%, transparent 75%, currentColor 75%, currentColor 85%, transparent 85%)',
-                    }}
-                />
+                <>
+                    {/* Edge grips: full-length 8px strips so the window can be resized
+                        anywhere along the right / bottom border, not only at the corner. */}
+                    <div
+                        onMouseDown={startResize('x')}
+                        title="Resize width"
+                        className="absolute top-0 -right-1.5 h-full w-3 cursor-ew-resize z-10"
+                    />
+                    <div
+                        onMouseDown={startResize('y')}
+                        title="Resize height"
+                        className="absolute -bottom-1.5 left-0 w-full h-3 cursor-ns-resize z-10"
+                    />
+                    <div
+                        onMouseDown={startResize('both')}
+                        title="Resize"
+                        className="absolute bottom-0 right-0 w-6 h-6 cursor-nwse-resize text-zinc-400 hover:text-zinc-200 z-20 bg-no-repeat"
+                        style={{
+                            backgroundImage: 'linear-gradient(135deg, transparent 55%, currentColor 55%, currentColor 65%, transparent 65%, transparent 75%, currentColor 75%, currentColor 85%, transparent 85%)',
+                            backgroundSize: '16px 16px',
+                            backgroundPosition: 'bottom 2px right 2px',
+                        }}
+                    />
+                </>
             )}
         </div>,
         document.body
