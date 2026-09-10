@@ -434,6 +434,7 @@ const UsersPage = () => {
                                 className="h-9 bg-muted/30 border-border rounded-md font-semibold"
                                 value={editUserData.nickname}
                                 onChange={(e) => setEditUserData({ ...editUserData, nickname: e.target.value })}
+                                maxLength={100}
                             />
                         </div>
                         <div className="space-y-2">
@@ -444,6 +445,7 @@ const UsersPage = () => {
                                 className="h-9 bg-muted/30 border-border rounded-md font-semibold"
                                 value={editUserData.chat_account_id}
                                 onChange={(e) => setEditUserData({ ...editUserData, chat_account_id: e.target.value })}
+                                maxLength={100}
                             />
                         </div>
                         <div className="space-y-2">

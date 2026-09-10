@@ -127,8 +127,21 @@ Every command, URL, header, and file body is a Pongo2 template. Available scopes
 Nickname and Chat Account ID are set by the user on **Profile**, or by an administrator on
 **Users → Edit Identity**.
 
-A **schedule** run has no triggering account, so every `user.*` key renders empty. Values
-containing characters the command sanitizer rejects also render empty.
+A **schedule** run has no triggering account, so every `user.*` key renders empty.
+Nickname and Chat Account ID accept letters, digits, spaces and `. _ @ + -` only, so they
+are safe to drop straight into a command.
+
+### Filters
+
+| Filter | Use |
+| :--- | :--- |
+| `json` | Render a map/array as JSON — `{{ flow.g1.step.rows \| json }}` |
+| `shellquote` | Quote untrusted text before it enters a command |
+| `filter_by` | Keep matching rows — `\| filter_by:"active=true"` |
+| `pluck` | Take one column — `\| pluck:"email"` |
+| `attr` | Read one property — `\| attr:"email"` (sugar: `(expr).email`) |
+| `find` | First matching row — `\| find:"_id=42"` |
+| `get` | Index into an array or map |
 
 ### Common patterns
 - Conditional command: `{% if input.dry_run == "yes" %}--dry-run{% endif %}`

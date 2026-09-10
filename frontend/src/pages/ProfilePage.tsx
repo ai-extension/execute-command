@@ -190,6 +190,7 @@ const ProfilePage = () => {
                                                 value={profileData.nickname}
                                                 onChange={(e) => setProfileData({ ...profileData, nickname: e.target.value })}
                                                 placeholder="Short name used by workflows"
+                                                maxLength={100}
                                                 className="pl-12 h-9 bg-muted/20 border-border focus:bg-muted/40 transition-all rounded-md font-bold text-sm"
                                             />
                                         </div>
@@ -203,10 +204,15 @@ const ProfilePage = () => {
                                                 value={profileData.chat_account_id}
                                                 onChange={(e) => setProfileData({ ...profileData, chat_account_id: e.target.value })}
                                                 placeholder="Slack / chat member ID"
+                                                maxLength={100}
                                                 className="pl-12 h-9 bg-muted/20 border-border focus:bg-muted/40 transition-all rounded-md font-bold text-sm"
                                             />
                                         </div>
                                     </div>
+
+                                    <p className="text-[10px] text-muted-foreground/70 ml-1 leading-relaxed">
+                                        Workflows read these as <code className="bg-primary/10 px-1 rounded text-primary font-mono">{"{{ user.nickname }}"}</code> and <code className="bg-primary/10 px-1 rounded text-primary font-mono">{"{{ user.chat_account_id }}"}</code>. Letters, digits, spaces and <span className="font-mono">. _ @ + -</span> only.
+                                    </p>
 
                                     <div className="space-y-2">
                                         <label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60 ml-1">Email Address</label>
