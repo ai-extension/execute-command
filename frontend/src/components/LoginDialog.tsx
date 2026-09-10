@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Zap, Shield, Lock, User as UserIcon, ArrowRight, Loader2 } from 'lucide-react';
+import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 import { API_BASE_URL } from '../lib/api';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -23,7 +24,28 @@ const LoginDialog: React.FC<LoginDialogProps> = ({ isOpen, onOpenChange, onSucce
     const [password, setPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
+    const [googleEnabled, setGoogleEnabled] = useState(false);
+    const [googleClientId, setGoogleClientId] = useState('');
     const { login } = useAuth();
+
+    // Only ask while the dialog is open: a public page renders this for visitors who
+    // may never open it.
+    useEffect(() => {
+        if (!isOpen) return;
+
+        const fetchSettings = async () => {
+            try {
+                const response = await fetch(`${API_BASE_URL}/settings/public`);
+                if (!response.ok) return;
+                const data = await response.json();
+                setGoogleEnabled(!!data.google_auth_enabled);
+                setGoogleClientId(data.google_client_id || '');
+            } catch (err) {
+                console.error('Failed to fetch public settings', err);
+            }
+        };
+        fetchSettings();
+    }, [isOpen]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -46,6 +68,40 @@ const LoginDialog: React.FC<LoginDialogProps> = ({ isOpen, onOpenChange, onSucce
             } else {
                 const data = await response.json();
                 setError(data.error || 'Login failed');
+            }
+        } catch (err) {
+            setError('Failed to connect to server');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // The credential is a Google ID token; the backend verifies it and maps the
+    // signing-in domain to a role.
+    const handleGoogleCredential = async (credential?: string) => {
+        if (!credential) {
+            setError('Google did not return a credential');
+            return;
+        }
+
+        setIsLoading(true);
+        setError('');
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/auth/google`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ id_token: credential }),
+            });
+
+            const data = await response.json();
+            if (response.ok) {
+                login(data.token, data.user);
+                onOpenChange(false);
+                if (onSuccess) onSuccess();
+            } else {
+                setError(data.error || 'Google login failed');
             }
         } catch (err) {
             setError('Failed to connect to server');
@@ -131,6 +187,34 @@ const LoginDialog: React.FC<LoginDialogProps> = ({ isOpen, onOpenChange, onSucce
                             )}
                         </Button>
                     </form>
+
+                    {googleEnabled && googleClientId && (
+                        <div className="mt-8 space-y-6">
+                            <div className="relative">
+                                <div className="absolute inset-0 flex items-center">
+                                    <span className="w-full border-t border-white/5"></span>
+                                </div>
+                                <div className="relative flex justify-center text-[10px] uppercase font-black tracking-[0.3em]">
+                                    <span className="bg-[#0f0f0f] px-4 text-muted-foreground/30">Connect via</span>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center justify-center">
+                                <GoogleOAuthProvider clientId={googleClientId}>
+                                    <div className="[color-scheme:light]">
+                                        <GoogleLogin
+                                            onSuccess={(response) => handleGoogleCredential(response.credential)}
+                                            onError={() => setError('Google login failed')}
+                                            theme="filled_black"
+                                            shape="pill"
+                                            text="continue_with"
+                                            width="280"
+                                        />
+                                    </div>
+                                </GoogleOAuthProvider>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </DialogContent>
         </Dialog>
