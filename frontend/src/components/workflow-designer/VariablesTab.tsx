@@ -325,6 +325,17 @@ interface VariablesTabProps {
     handleDragEnd: (result: DropResult) => void;
 }
 
+// Kept next to the authoring UI so the cheat sheet stays in step with the scopes the
+// executor actually injects (backend getInterpolationContext).
+const TEMPLATE_SCOPES: [string, string][] = [
+    ['{{ input.key }}', 'Runtime input, filled per run'],
+    ['{{ variable.key }}', 'Static workflow variable'],
+    ['{{ global.KEY }}', 'Global variable of this namespace'],
+    ['{{ flow.group.step.action_key }}', 'Output of an earlier step · flow.group.status for its state'],
+    ['{{ item }} / {{ index }}', 'Current element and 0-based position, inside a loop only'],
+    ['{{ user.nickname }}', 'Runner identity · also username, full_name, email, chat_account_id, id · empty on a schedule run'],
+];
+
 export const VariablesTab: React.FC<VariablesTabProps> = ({
     inputs, setInputs, variables, setVariables, copyToClipboard, copiedKey, handleDragEnd
 }) => {
@@ -775,6 +786,21 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
                         </p>
                     </div>
                 </div>
+
+                <details className="bg-muted/20 border border-border rounded-md p-4 text-[10px] text-muted-foreground">
+                    <summary className="cursor-pointer font-bold uppercase tracking-tight text-foreground/80">Every scope you can use in a template</summary>
+                    <div className="mt-3 grid gap-1 font-mono leading-relaxed">
+                        {TEMPLATE_SCOPES.map(([expr, note]) => (
+                            <div key={expr} className="flex flex-wrap gap-x-2">
+                                <code className="bg-primary/10 px-1 rounded text-primary">{expr}</code>
+                                <span className="font-sans opacity-70">{note}</span>
+                            </div>
+                        ))}
+                    </div>
+                    <p className="mt-3 font-sans opacity-70 leading-relaxed">
+                        Filters: <code className="bg-muted/60 px-1 rounded">json</code> <code className="bg-muted/60 px-1 rounded">shellquote</code> <code className="bg-muted/60 px-1 rounded">filter_by</code> <code className="bg-muted/60 px-1 rounded">pluck</code> <code className="bg-muted/60 px-1 rounded">attr</code> <code className="bg-muted/60 px-1 rounded">find</code> <code className="bg-muted/60 px-1 rounded">get</code> — e.g. {"{{ flow.g1.step.rows | pluck:'email' | json }}"}. Always pass untrusted text through <code className="bg-muted/60 px-1 rounded">| shellquote</code> inside a command.
+                    </p>
+                </details>
             </div>
         </div>
     );

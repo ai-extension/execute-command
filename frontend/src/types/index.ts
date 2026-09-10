@@ -506,6 +506,8 @@ export interface User {
     username: string;
     email?: string;
     full_name?: string;
+    nickname?: string;
+    chat_account_id?: string;
     created_at?: string;
     updated_at?: string;
 }
