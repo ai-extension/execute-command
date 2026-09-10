@@ -56,6 +56,7 @@ func main() {
 		&domain.Namespace{},
 		&domain.User{},
 		&domain.Role{},
+		&domain.DomainRoleMapping{},
 		&domain.Permission{},
 		&domain.RolePermission{},
 		&domain.Server{},
@@ -90,6 +91,7 @@ func main() {
 	namespaceRepo := repository.NewPostgresNamespaceRepo(db)
 	userRepo := repository.NewPostgresUserRepo(db)
 	roleRepo := repository.NewPostgresRoleRepo(db)
+	domainRoleMappingRepo := repository.NewPostgresDomainRoleMappingRepo(db)
 	permRepo := repository.NewPostgresPermissionRepo(db)
 	serverRepo := repository.NewPostgresServerRepo(db)
 	workflowRepo := repository.NewPostgresWorkflowRepo(db)
@@ -124,7 +126,7 @@ func main() {
 	sshPool := service.NewSSHPool()
 	vpnConnector := service.NewVpnConnector()
 	auditLogService := service.NewAuditLogService(auditLogRepo)
-	authService := service.NewAuthService(userRepo, settingRepo)
+	authService := service.NewAuthService(userRepo, settingRepo, domainRoleMappingRepo)
 	serverService := service.NewServerService(serverRepo, hub, vpnConnector, sshPool)
 	terminalService := service.NewTerminalService(serverRepo, hub, vpnConnector, sshPool)
 	workflowService := service.NewWorkflowService(workflowRepo, workflowGroupRepo, workflowStepRepo, workflowInputRepo, workflowVariableRepo, execRepo)
@@ -136,6 +138,7 @@ func main() {
 	vpnService := service.NewVpnConfigService(vpnRepo)
 	pageService := service.NewPageService(pageRepo)
 	settingsService := service.NewSettingsService(settingRepo)
+	googleAuthService := service.NewGoogleAuthService(userRepo, domainRoleMappingRepo, settingsService, authService)
 	dashboardService := service.NewDashboardService(workflowRepo, execRepo, scheduleRepo, serverRepo, vpnRepo, userRepo)
 
 	mcpService := service.NewMCPService(workflowService, workflowExecutor, scheduleService, tagService)
@@ -154,8 +157,9 @@ func main() {
 
 	// Initialize Handlers
 	namespaceHandler := handler.NewNamespaceHandler(namespaceRepo, auditLogService)
-	authHandler := handler.NewAuthHandler(authService, auditLogService)
-	userHandler := handler.NewUserHandler(userRepo, roleRepo, apiKeyRepo, auditLogService)
+	authHandler := handler.NewAuthHandler(authService, googleAuthService, auditLogService)
+	domainRoleMappingHandler := handler.NewDomainRoleMappingHandler(domainRoleMappingRepo, roleRepo, auditLogService)
+	userHandler := handler.NewUserHandler(userRepo, roleRepo, apiKeyRepo, domainRoleMappingRepo, auditLogService)
 	roleHandler := handler.NewRoleHandler(roleRepo, permRepo, auditLogService)
 	permHandler := handler.NewPermissionHandler(permRepo, workflowRepo, globalVarRepo, scheduleRepo, pageRepo, tagRepo, serverRepo, namespaceRepo, execRepo, userRepo, roleRepo, vpnRepo, datasetRepo, auditLogService)
 	serverHandler := handler.NewServerHandler(serverService, terminalService, auditLogService)
@@ -203,7 +207,7 @@ func main() {
 	{
 		api.POST("/login", middleware.LoginRateLimiter(), authHandler.Login)
 		api.POST("/register", middleware.LoginRateLimiter(), authHandler.Register)
-		api.POST("/social-login", middleware.LoginRateLimiter(), authHandler.SocialLogin)
+		api.POST("/auth/google", middleware.LoginRateLimiter(), authHandler.GoogleLogin)
 		api.POST("/logout", authHandler.Logout)
 		api.GET("/ws", wsHandler.HandleWS)
 
@@ -332,6 +336,12 @@ func main() {
 			// System Settings
 			protected.GET("/settings", middleware.RBACMiddleware(db, userRepo, "settings", "READ"), settingsHandler.GetSettings)
 			protected.PUT("/settings", middleware.RBACMiddleware(db, userRepo, "settings", "WRITE"), settingsHandler.UpdateSetting)
+
+			// Google domain -> role mappings (guarded by the settings permission)
+			protected.GET("/domain-role-mappings", middleware.RBACMiddleware(db, userRepo, "settings", "READ"), domainRoleMappingHandler.List)
+			protected.POST("/domain-role-mappings", middleware.RBACMiddleware(db, userRepo, "settings", "WRITE"), domainRoleMappingHandler.Create)
+			protected.PUT("/domain-role-mappings/:id", middleware.RBACMiddleware(db, userRepo, "settings", "WRITE"), domainRoleMappingHandler.Update)
+			protected.DELETE("/domain-role-mappings/:id", middleware.RBACMiddleware(db, userRepo, "settings", "WRITE"), domainRoleMappingHandler.Delete)
 
 			// Audit Logs
 			protected.GET("/audit-logs", middleware.RBACMiddleware(db, userRepo, "audit_logs", "READ"), auditLogHandler.ListAuditLogs)

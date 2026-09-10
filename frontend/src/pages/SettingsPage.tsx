@@ -27,6 +27,7 @@ import { Label } from '../components/ui/label';
 import { useAuth } from '../context/AuthContext';
 import { useNamespace } from '../context/NamespaceContext';
 import { API_BASE_URL } from '../lib/api';
+import DomainRoleMappingCard from '../components/settings/DomainRoleMappingCard';
 import { cn } from '../lib/utils';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import {
@@ -594,6 +595,8 @@ const SettingsPage = () => {
                                 </div>
                             </CardContent>
                         </Card>
+
+                        <DomainRoleMappingCard />
                     </div>
                 )}
 

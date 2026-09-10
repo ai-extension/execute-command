@@ -16,18 +16,20 @@ import (
 )
 
 type UserHandler struct {
-	userRepo   domain.UserRepository
-	roleRepo   domain.RoleRepository
-	apiKeyRepo domain.APIKeyRepository
-	auditLog   domain.AuditLogService
+	userRepo    domain.UserRepository
+	roleRepo    domain.RoleRepository
+	apiKeyRepo  domain.APIKeyRepository
+	mappingRepo domain.DomainRoleMappingRepository
+	auditLog    domain.AuditLogService
 }
 
-func NewUserHandler(userRepo domain.UserRepository, roleRepo domain.RoleRepository, apiKeyRepo domain.APIKeyRepository, auditLog domain.AuditLogService) *UserHandler {
+func NewUserHandler(userRepo domain.UserRepository, roleRepo domain.RoleRepository, apiKeyRepo domain.APIKeyRepository, mappingRepo domain.DomainRoleMappingRepository, auditLog domain.AuditLogService) *UserHandler {
 	return &UserHandler{
-		userRepo:   userRepo,
-		roleRepo:   roleRepo,
-		apiKeyRepo: apiKeyRepo,
-		auditLog:   auditLog,
+		userRepo:    userRepo,
+		roleRepo:    roleRepo,
+		apiKeyRepo:  apiKeyRepo,
+		mappingRepo: mappingRepo,
+		auditLog:    auditLog,
 	}
 }
 
@@ -90,6 +92,17 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "user not found"})
 		return
+	}
+
+	// An address inside a Google-mapped domain decides which account a Google identity
+	// links to, so it cannot be claimed here. Unmapped domains stay editable, and
+	// re-saving the current address is always allowed.
+	if !strings.EqualFold(strings.TrimSpace(input.Email), strings.TrimSpace(user.Email)) {
+		if managedDomain, managed := domain.IsManagedEmailDomain(h.mappingRepo, input.Email); managed {
+			h.auditLog.LogAction(c, "UPDATE_PROFILE", "USER", user.ID.String(), map[string]string{"email": input.Email, "error": "managed domain"}, "FAILED")
+			c.JSON(http.StatusForbidden, gin.H{"error": "addresses at " + managedDomain + " are managed by Google sign-in; ask an administrator to change it"})
+			return
+		}
 	}
 
 	user.FullName = input.FullName

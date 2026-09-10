@@ -69,9 +69,16 @@ func (h *SettingsHandler) GetPublicSettings(c *gin.Context) {
 		facebookEnabled = "false"
 	}
 
+	// The OAuth client id is public by design; the client secret must never be exposed here.
+	googleClientID := ""
+	if googleEnabled == "true" {
+		googleClientID, _ = h.settingsService.GetSetting("google_client_id")
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"allow_registration":    allowReg == "true",
 		"google_auth_enabled":   googleEnabled == "true",
+		"google_client_id":      googleClientID,
 		"facebook_auth_enabled": facebookEnabled == "true",
 	})
 }

@@ -32,10 +32,11 @@ func init() {
 type AuthService struct {
 	userRepo     domain.UserRepository
 	settingsRepo domain.SystemSettingRepository
+	mappingRepo  domain.DomainRoleMappingRepository
 }
 
-func NewAuthService(userRepo domain.UserRepository, settingsRepo domain.SystemSettingRepository) *AuthService {
-	return &AuthService{userRepo: userRepo, settingsRepo: settingsRepo}
+func NewAuthService(userRepo domain.UserRepository, settingsRepo domain.SystemSettingRepository, mappingRepo domain.DomainRoleMappingRepository) *AuthService {
+	return &AuthService{userRepo: userRepo, settingsRepo: settingsRepo, mappingRepo: mappingRepo}
 }
 
 func (s *AuthService) Register(username, password, email string) (*domain.User, error) {
@@ -48,6 +49,12 @@ func (s *AuthService) Register(username, password, email string) (*domain.User, 
 	// Check if user already exists
 	if _, err := s.userRepo.GetByUsername(username); err == nil {
 		return nil, errors.New("username already exists")
+	}
+
+	// Registering with an address in a Google-mapped domain would pre-claim the account
+	// that domain's first Google sign-in links to.
+	if managedDomain, managed := domain.IsManagedEmailDomain(s.mappingRepo, email); managed {
+		return nil, errors.New("addresses at " + managedDomain + " must sign in with Google")
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
@@ -105,6 +112,20 @@ func (s *AuthService) Login(username, password string) (string, *domain.User, er
 	return tokenString, user, nil
 }
 
+// GenerateToken issues a session token for an already-authenticated user. The claim
+// shape must stay identical to Login's, as AuthMiddleware reads user_id from it.
+func (s *AuthService) GenerateToken(user *domain.User) (string, error) {
+	expirationHours := s.GetTokenExpirationHours()
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"user_id":  user.ID,
+		"username": user.Username,
+		"exp":      time.Now().Add(time.Hour * time.Duration(expirationHours)).Unix(),
+	})
+
+	return token.SignedString(jwtKey)
+}
+
 func (s *AuthService) ValidateToken(tokenString string) (jwt.MapClaims, error) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		return jwtKey, nil
@@ -123,47 +144,4 @@ func (s *AuthService) ValidateToken(tokenString string) (jwt.MapClaims, error) {
 
 func (s *AuthService) GetUserByUsername(username string) (*domain.User, error) {
 	return s.userRepo.GetByUsername(username)
-}
-
-func (s *AuthService) SocialLogin(provider, socialID, email, fullName, avatarURL string) (string, *domain.User, error) {
-	// 1. Try to find user by email (using it as unique identifier)
-	user, err := s.userRepo.GetByUsername(email)
-	if err != nil {
-		// Create new user if not found
-		user = &domain.User{
-			ID:             uuid.New(),
-			Username:       email,
-			Email:          email,
-			FullName:       fullName,
-			SocialProvider: provider,
-			SocialID:       socialID,
-			AvatarURL:      avatarURL,
-		}
-		if err := s.userRepo.Create(user); err != nil {
-			return "", nil, err
-		}
-	} else {
-		// Update existing user's social info
-		user.SocialProvider = provider
-		user.SocialID = socialID
-		user.AvatarURL = avatarURL
-		user.FullName = fullName
-		s.userRepo.Update(user)
-	}
-
-	// Generate token
-	expirationHours := s.GetTokenExpirationHours()
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"user_id":  user.ID,
-		"username": user.Username,
-		"exp":      time.Now().Add(time.Hour * time.Duration(expirationHours)).Unix(),
-	})
-
-	tokenString, err := token.SignedString(jwtKey)
-	if err != nil {
-		return "", nil, err
-	}
-
-	return tokenString, user, nil
 }

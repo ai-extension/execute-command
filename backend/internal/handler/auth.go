@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -9,14 +10,16 @@ import (
 )
 
 type AuthHandler struct {
-	authService *service.AuthService
-	auditLog    domain.AuditLogService
+	authService   *service.AuthService
+	googleService *service.GoogleAuthService
+	auditLog      domain.AuditLogService
 }
 
-func NewAuthHandler(authService *service.AuthService, auditLog domain.AuditLogService) *AuthHandler {
+func NewAuthHandler(authService *service.AuthService, googleService *service.GoogleAuthService, auditLog domain.AuditLogService) *AuthHandler {
 	return &AuthHandler{
-		authService: authService,
-		auditLog:    auditLog,
+		authService:   authService,
+		googleService: googleService,
+		auditLog:      auditLog,
 	}
 }
 
@@ -77,13 +80,9 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	})
 }
 
-func (h *AuthHandler) SocialLogin(c *gin.Context) {
+func (h *AuthHandler) GoogleLogin(c *gin.Context) {
 	var req struct {
-		Provider  string `json:"provider" binding:"required"`
-		SocialID  string `json:"social_id" binding:"required"`
-		Email     string `json:"email" binding:"required,email"`
-		FullName  string `json:"full_name"`
-		AvatarURL string `json:"avatar_url"`
+		IDToken string `json:"id_token" binding:"required"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -91,19 +90,44 @@ func (h *AuthHandler) SocialLogin(c *gin.Context) {
 		return
 	}
 
-	token, user, err := h.authService.SocialLogin(req.Provider, req.SocialID, req.Email, req.FullName, req.AvatarURL)
+	token, user, err := h.googleService.LoginWithGoogle(c.Request.Context(), req.IDToken)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		h.auditLog.LogAction(c, "LOGIN_GOOGLE", "AUTH", "", map[string]string{"error": err.Error()}, "FAILED")
+		status := googleLoginStatus(err)
+		message := err.Error()
+		if status == http.StatusInternalServerError {
+			// Never hand an unauthenticated caller the internal failure; the audit log has it.
+			message = "google login failed"
+		}
+		c.JSON(status, gin.H{"error": message})
 		return
 	}
 
-	maxAgeSocial := h.authService.GetTokenExpirationHours() * 3600
-	c.SetCookie("auth_token", token, maxAgeSocial, "/", "", false, false)
+	h.auditLog.LogAction(c, "LOGIN_GOOGLE", "AUTH", user.ID.String(), map[string]string{"username": user.Username}, "SUCCESS")
+
+	maxAge := h.authService.GetTokenExpirationHours() * 3600
+	c.SetCookie("auth_token", token, maxAge, "/", "", false, false)
 
 	c.JSON(http.StatusOK, gin.H{
 		"token": token,
 		"user":  user,
 	})
+}
+
+// googleLoginStatus keeps an unusable configuration (503) distinguishable from a
+// rejected identity (401) and from a domain that is simply not allowed (403).
+func googleLoginStatus(err error) int {
+	switch {
+	case errors.Is(err, service.ErrGoogleLoginDisabled), errors.Is(err, service.ErrGoogleNotConfigured):
+		return http.StatusServiceUnavailable
+	case errors.Is(err, service.ErrDomainNotAllowed), errors.Is(err, service.ErrProvisioningDisabled),
+		errors.Is(err, service.ErrMappingRoleMissing), errors.Is(err, service.ErrAccountLinkedToOther):
+		return http.StatusForbidden
+	case errors.Is(err, service.ErrInvalidGoogleToken), errors.Is(err, service.ErrEmailNotVerified):
+		return http.StatusUnauthorized
+	default:
+		return http.StatusInternalServerError
+	}
 }
 
 func (h *AuthHandler) Logout(c *gin.Context) {

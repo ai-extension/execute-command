@@ -92,6 +92,48 @@ When a user clicks **Run** on a workflow:
 
 ---
 
+## 🌐 Google sign-in: domain → role mapping
+
+Users can sign in either with a username + password or with a Google Workspace account. Both routes end at the same user record, so an account created one way can later use the other.
+
+### How a Google sign-in is authorised
+
+1. The browser sends the Google **ID token** to `POST /api/auth/google`.
+2. The backend verifies the token's signature against Google's keys and checks that `aud` equals the configured `google_client_id`. Nothing the browser claims about the user is trusted.
+3. The account's company is read from the token's `hd` (hosted domain) claim — the only proof that Google Workspace manages the account.
+4. That domain is looked up in **Settings → Identity & Access → Domain → Role Mapping**. **No mapping means no sign-in**: unmapped domains are rejected before any account is created.
+5. The mapped role is granted, and a normal CSM session cookie is issued.
+
+### Mapping options
+
+| Option | Effect |
+| :--- | :--- |
+| **Granted Role** | The role given to accounts from this domain. |
+| **Auto-provision accounts** | Create the user on first sign-in. Off = only accounts that already exist may sign in. |
+| **Sync role on every login** | Re-apply the mapped role at each sign-in, overwriting roles set by hand. Off (default) = the role is set once, and manual changes survive. |
+| **Allow non-Workspace accounts** | Accept a personal Google account that merely uses a company address (no `hd` claim). Such an account is **not** managed by the company and keeps working after off-boarding — leave off unless the company has no Workspace. |
+| **Enabled** | Block a domain without deleting its mapping. |
+
+### Setup
+
+1. Google Cloud Console → create an **OAuth Client ID** of type *Web application*, listing the CSM origin under *Authorized JavaScript origins*.
+2. Settings → Identity & Access → enable **Google OAuth** and paste the Client ID. The client secret is not used by this flow.
+3. Add one mapping per company domain. Each alias (`example.com`, `example.jp`) needs its own row.
+
+### Addresses in a mapped domain are reserved
+
+Once a domain is mapped, its addresses decide which account a Google identity links to, so they cannot be claimed by hand:
+
+- **Public registration** rejects an email at a mapped domain (`must sign in with Google`).
+- **Profile → Email** rejects a change *into* a mapped domain. Users keep editing their name, and addresses outside mapped domains stay editable.
+- A **disabled** mapping still reserves its domain; only removing the mapping frees it.
+- An **administrator** (`users:WRITE`) may still create or edit a user with such an address — that is how an account is pre-provisioned before its owner's first Google sign-in.
+
+> [!WARNING]
+> Revoking a Google account does not end an existing CSM session: the JWT stays valid until `token_expiration` elapses (24h by default). Remove the user in CSM as well when off-boarding.
+
+---
+
 ## 🧠 Reference
 
 - **Default Super Admin** — created at install; has all bits enabled across all namespaces. Treat like a `root` account.

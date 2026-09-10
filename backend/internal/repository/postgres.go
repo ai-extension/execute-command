@@ -154,6 +154,23 @@ func (r *PostgresUserRepo) GetByUsername(username string) (*domain.User, error) 
 	return &user, nil
 }
 
+func (r *PostgresUserRepo) GetByEmail(email string) (*domain.User, error) {
+	var user domain.User
+	if err := r.db.Preload("Roles.Permissions.Permission").Preload("Permissions").Take(&user, "LOWER(email) = LOWER(?)", email).Error; err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+func (r *PostgresUserRepo) GetBySocialID(provider, socialID string) (*domain.User, error) {
+	var user domain.User
+	if err := r.db.Preload("Roles.Permissions.Permission").Preload("Permissions").
+		Take(&user, "social_provider = ? AND social_id = ?", provider, socialID).Error; err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
 func (r *PostgresUserRepo) List() ([]domain.User, error) {
 	var users []domain.User
 	if err := r.db.Preload("Roles").Order("created_at DESC").Find(&users).Error; err != nil {
@@ -224,6 +241,65 @@ func (r *PostgresUserRepo) Delete(id uuid.UUID) error {
 
 func (r *PostgresUserRepo) SetRoles(userID uuid.UUID, roles []domain.Role) error {
 	return r.db.Model(&domain.User{ID: userID}).Association("Roles").Replace(roles)
+}
+
+type PostgresDomainRoleMappingRepo struct {
+	db *gorm.DB
+}
+
+func NewPostgresDomainRoleMappingRepo(db *gorm.DB) *PostgresDomainRoleMappingRepo {
+	return &PostgresDomainRoleMappingRepo{db: db}
+}
+
+func (r *PostgresDomainRoleMappingRepo) Create(mapping *domain.DomainRoleMapping) error {
+	return r.db.Create(mapping).Error
+}
+
+func (r *PostgresDomainRoleMappingRepo) GetByID(id uuid.UUID) (*domain.DomainRoleMapping, error) {
+	var mapping domain.DomainRoleMapping
+	if err := r.db.Preload("Role").Take(&mapping, "id = ?", id).Error; err != nil {
+		return nil, err
+	}
+	return &mapping, nil
+}
+
+func (r *PostgresDomainRoleMappingRepo) GetByDomain(domainName string) (*domain.DomainRoleMapping, error) {
+	var mapping domain.DomainRoleMapping
+	if err := r.db.Preload("Role").Take(&mapping, "LOWER(domain) = LOWER(?)", domainName).Error; err != nil {
+		return nil, err
+	}
+	return &mapping, nil
+}
+
+func (r *PostgresDomainRoleMappingRepo) List() ([]domain.DomainRoleMapping, error) {
+	var mappings []domain.DomainRoleMapping
+	if err := r.db.Preload("Role").Order("domain ASC").Find(&mappings).Error; err != nil {
+		return nil, err
+	}
+	return mappings, nil
+}
+
+func (r *PostgresDomainRoleMappingRepo) Update(mapping *domain.DomainRoleMapping) error {
+	// Omit Role so a payload carrying the preloaded association does not upsert the role itself.
+	return r.db.Omit("Role").Save(mapping).Error
+}
+
+func (r *PostgresDomainRoleMappingRepo) Delete(id uuid.UUID) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		var mapping domain.DomainRoleMapping
+		if err := tx.Take(&mapping, "id = ?", id).Error; err != nil {
+			return err
+		}
+
+		// The unique index on domain covers soft-deleted rows too, so the name is
+		// prefixed on delete to keep the domain re-addable (same trick as users/roles).
+		newDomain := "deleted_" + strconv.FormatInt(time.Now().Unix(), 10) + "_" + mapping.Domain
+		if err := tx.Model(&mapping).Update("domain", newDomain).Error; err != nil {
+			return err
+		}
+
+		return tx.Delete(&mapping).Error
+	})
 }
 
 type PostgresRoleRepo struct {

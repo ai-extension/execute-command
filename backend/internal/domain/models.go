@@ -3,6 +3,7 @@ package domain
 import (
 	"context"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -97,10 +98,66 @@ type PermissionScope struct {
 	AllowedTagIDs       []string
 }
 
+// DomainRoleMapping binds a verified Google Workspace domain to the role granted
+// to accounts signing in from it. No mapping for a domain means that domain is denied.
+type DomainRoleMapping struct {
+	ID     uuid.UUID `json:"id" gorm:"type:uuid;primaryKey"`
+	Domain string    `json:"domain" gorm:"uniqueIndex;not null"`
+	RoleID uuid.UUID `json:"role_id" gorm:"type:uuid;index;not null"`
+	Role   *Role     `json:"role,omitempty" gorm:"foreignKey:RoleID"`
+	// AutoProvision creates a user on first sign-in; when false only accounts that
+	// already exist may sign in from this domain.
+	AutoProvision bool `json:"auto_provision"`
+	// SyncOnLogin re-applies the mapped role on every sign-in, overwriting roles an
+	// administrator set by hand. Off by default so manual grants survive.
+	SyncOnLogin bool `json:"sync_on_login"`
+	// AllowNonWorkspace accepts accounts whose ID token carries no `hd` claim (a
+	// consumer Google account registered with a company address). Such accounts are
+	// not managed by the company and keep working after off-boarding.
+	AllowNonWorkspace bool           `json:"allow_non_workspace"`
+	Enabled           bool           `json:"enabled"`
+	CreatedAt         time.Time      `json:"created_at" gorm:"<-:create"`
+	UpdatedAt         time.Time      `json:"updated_at"`
+	DeletedAt         gorm.DeletedAt `json:"-" gorm:"index"`
+}
+
+// IsManagedEmailDomain reports whether an address belongs to a domain that has a Google
+// sign-in mapping, enabled or not — a disabled mapping still reserves its domain. Such addresses decide which account a Google identity is linked
+// to, so they must not be claimed by hand — otherwise a user could set their own
+// address to a colleague's and capture that colleague's first sign-in.
+func IsManagedEmailDomain(repo DomainRoleMappingRepository, email string) (string, bool) {
+	at := strings.LastIndex(email, "@")
+	if repo == nil || at < 0 {
+		return "", false
+	}
+
+	emailDomain := strings.ToLower(strings.TrimSpace(email[at+1:]))
+	if emailDomain == "" {
+		return "", false
+	}
+
+	mapping, err := repo.GetByDomain(emailDomain)
+	if err != nil || mapping == nil {
+		return "", false
+	}
+	return emailDomain, true
+}
+
+type DomainRoleMappingRepository interface {
+	Create(mapping *DomainRoleMapping) error
+	GetByID(id uuid.UUID) (*DomainRoleMapping, error)
+	GetByDomain(domain string) (*DomainRoleMapping, error)
+	List() ([]DomainRoleMapping, error)
+	Update(mapping *DomainRoleMapping) error
+	Delete(id uuid.UUID) error
+}
+
 type UserRepository interface {
 	Create(user *User) error
 	GetByID(id uuid.UUID) (*User, error)
 	GetByUsername(username string) (*User, error)
+	GetByEmail(email string) (*User, error)
+	GetBySocialID(provider, socialID string) (*User, error)
 	List() ([]User, error)
 	ListPaginated(limit, offset int, searchTerm string, roleID *uuid.UUID) ([]User, int64, error)
 	Update(user *User) error
@@ -322,34 +379,34 @@ type WorkflowGroup struct {
 	McpReportLog       bool           `json:"mcp_report_log" gorm:"default:false"`
 	Skip               bool           `json:"skip" gorm:"default:false"`
 	// Terminal settings
-	UseTTY             bool           `json:"use_tty" gorm:"default:false"`
+	UseTTY bool `json:"use_tty" gorm:"default:false"`
 	// AutoInputs: JSON array of AutoInputRule, e.g. [{"pattern":"Password:","input":"secret"}]
-	AutoInputs         string         `json:"auto_inputs" gorm:"default:''"`
-	CreatedAt          time.Time      `json:"created_at" gorm:"<-:create"`
-	UpdatedAt          time.Time      `json:"updated_at"`
+	AutoInputs string    `json:"auto_inputs" gorm:"default:''"`
+	CreatedAt  time.Time `json:"created_at" gorm:"<-:create"`
+	UpdatedAt  time.Time `json:"updated_at"`
 }
 
 type WorkflowStep struct {
-	ID                   uuid.UUID  `json:"id" gorm:"type:uuid;primaryKey"`
-	GroupID              uuid.UUID  `json:"group_id" gorm:"type:uuid;index;constraint:OnDelete:CASCADE;"`
-	ServerID             uuid.UUID  `json:"server_id,omitempty" gorm:"type:uuid;index"` // Optional: If empty, run locally
-	Name                 string     `json:"name" gorm:"not null"`
-	ActionType           string     `json:"action_type" gorm:"not null;default:'COMMAND'"` // COMMAND, WORKFLOW, or HTTP
-	ActionKey            string     `json:"action_key" gorm:"default:''"`
-	CommandText          string     `json:"command_text"`
-	HttpUrl              string     `json:"http_url" gorm:"default:''"`
-	HttpMethod           string     `json:"http_method" gorm:"default:'GET'"`
-	HttpHeaders          string     `json:"http_headers" gorm:"default:'{}'"` // JSON string map[string]string
-	HttpBody             string     `json:"http_body" gorm:"default:''"`
-	OutputFormat         string     `json:"output_format" gorm:"default:'json'"` // json or string
+	ID           uuid.UUID `json:"id" gorm:"type:uuid;primaryKey"`
+	GroupID      uuid.UUID `json:"group_id" gorm:"type:uuid;index;constraint:OnDelete:CASCADE;"`
+	ServerID     uuid.UUID `json:"server_id,omitempty" gorm:"type:uuid;index"` // Optional: If empty, run locally
+	Name         string    `json:"name" gorm:"not null"`
+	ActionType   string    `json:"action_type" gorm:"not null;default:'COMMAND'"` // COMMAND, WORKFLOW, or HTTP
+	ActionKey    string    `json:"action_key" gorm:"default:''"`
+	CommandText  string    `json:"command_text"`
+	HttpUrl      string    `json:"http_url" gorm:"default:''"`
+	HttpMethod   string    `json:"http_method" gorm:"default:'GET'"`
+	HttpHeaders  string    `json:"http_headers" gorm:"default:'{}'"` // JSON string map[string]string
+	HttpBody     string    `json:"http_body" gorm:"default:''"`
+	OutputFormat string    `json:"output_format" gorm:"default:'json'"` // json or string
 	// Dataset action (ActionType == "DATASET")
-	DatasetID            *uuid.UUID `json:"dataset_id,omitempty" gorm:"type:uuid;index"`
-	DatasetOperation     string     `json:"dataset_operation" gorm:"default:''"` // QUERY | INSERT | UPDATE | DELETE
-	DatasetFilter        string     `json:"dataset_filter"`                      // "key=val,..." templated; matchConditions syntax
-	DatasetPayload       string     `json:"dataset_payload"`                     // JSON object or array, templated (INSERT/UPDATE)
-	DatasetLimit         int        `json:"dataset_limit" gorm:"default:0"`      // QUERY cap; 0 = default cap
+	DatasetID        *uuid.UUID `json:"dataset_id,omitempty" gorm:"type:uuid;index"`
+	DatasetOperation string     `json:"dataset_operation" gorm:"default:''"` // QUERY | INSERT | UPDATE | DELETE
+	DatasetFilter    string     `json:"dataset_filter"`                      // "key=val,..." templated; matchConditions syntax
+	DatasetPayload   string     `json:"dataset_payload"`                     // JSON object or array, templated (INSERT/UPDATE)
+	DatasetLimit     int        `json:"dataset_limit" gorm:"default:0"`      // QUERY cap; 0 = default cap
 	// Convert action (ActionType == "CONVERT") — parse a templated text source into JSON
-	ConvertSource        string     `json:"convert_source"`
+	ConvertSource string `json:"convert_source"`
 	// ConvertFields: JSON array of field extractors, e.g.
 	// [{"name":"id","start":"Order: ","end_mode":"delimiter","end":",","format":"number","default":"0"}].
 	// When non-empty, CONVERT greps each field out of the rendered source and returns a JSON object
@@ -364,19 +421,19 @@ type WorkflowStep struct {
 }
 
 type WorkflowInput struct {
-	ID           uuid.UUID `json:"id" gorm:"type:uuid;primaryKey"`
-	WorkflowID   uuid.UUID `json:"workflow_id" gorm:"type:uuid;index;constraint:OnDelete:CASCADE;"`
-	Key          string    `json:"key" gorm:"not null"`
-	Label        string    `json:"label" gorm:"not null"`
-	Type         string    `json:"type" gorm:"not null;default:'input'"` // input, number, select, multi-select, multi-input, file, dataset-select, dataset-multi-select, date, time
+	ID                uuid.UUID `json:"id" gorm:"type:uuid;primaryKey"`
+	WorkflowID        uuid.UUID `json:"workflow_id" gorm:"type:uuid;index;constraint:OnDelete:CASCADE;"`
+	Key               string    `json:"key" gorm:"not null"`
+	Label             string    `json:"label" gorm:"not null"`
+	Type              string    `json:"type" gorm:"not null;default:'input'"` // input, number, select, multi-select, multi-input, file, dataset-select, dataset-multi-select, date, time
 	DefaultValue      string    `json:"default_value"`
 	CollapseInitially bool      `json:"collapse_initially" gorm:"default:false"`
 	AllowFolder       bool      `json:"allow_folder" gorm:"default:false"` // type=file only: let users pick an entire folder (structure preserved)
 	IncludeTime       bool      `json:"include_time" gorm:"default:false"` // type=date only: pick a date AND a time (value becomes YYYY-MM-DDTHH:MM)
 	Required          bool      `json:"required" gorm:"default:false"`
-	Order        int       `json:"order" gorm:"default:0"`
-	CreatedAt    time.Time `json:"created_at" gorm:"<-:create"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	Order             int       `json:"order" gorm:"default:0"`
+	CreatedAt         time.Time `json:"created_at" gorm:"<-:create"`
+	UpdatedAt         time.Time `json:"updated_at"`
 }
 
 // WorkflowOutput declares one field of a workflow's Result contract. `Source` is a
@@ -459,18 +516,18 @@ const (
 )
 
 type Schedule struct {
-	ID                 uuid.UUID          `json:"id" gorm:"type:uuid;primaryKey"`
-	NamespaceID        uuid.UUID          `json:"namespace_id" gorm:"type:uuid;index;constraint:OnDelete:CASCADE;"`
-	Name               string             `json:"name" gorm:"not null"`
-	Type               ScheduleType       `json:"type" gorm:"not null"`
-	CronExpression     string             `json:"cron_expression"`
-	NextRunAt          *time.Time         `json:"next_run_at"`
+	ID             uuid.UUID    `json:"id" gorm:"type:uuid;primaryKey"`
+	NamespaceID    uuid.UUID    `json:"namespace_id" gorm:"type:uuid;index;constraint:OnDelete:CASCADE;"`
+	Name           string       `json:"name" gorm:"not null"`
+	Type           ScheduleType `json:"type" gorm:"not null"`
+	CronExpression string       `json:"cron_expression"`
+	NextRunAt      *time.Time   `json:"next_run_at"`
 	// StartDate/EndDate bound a RECURRING schedule's active window (both optional).
 	// The cron only fires while now is within [StartDate, EndDate]. Nil means
 	// unbounded on that side. Ignored for ONE_TIME.
-	StartDate          *time.Time         `json:"start_date"`
-	EndDate            *time.Time         `json:"end_date"`
-	Status             string             `json:"status" gorm:"default:'ACTIVE'"` // ACTIVE, PAUSED
+	StartDate *time.Time `json:"start_date"`
+	EndDate   *time.Time `json:"end_date"`
+	Status    string     `json:"status" gorm:"default:'ACTIVE'"` // ACTIVE, PAUSED
 	// PageID is set when the schedule was created from a public page's ENDPOINT widget
 	// (self-service scheduling). Nil for regular admin-created schedules.
 	PageID             *uuid.UUID         `json:"page_id,omitempty" gorm:"type:uuid;index"`
@@ -498,17 +555,17 @@ type ScheduleWorkflow struct {
 }
 
 type WorkflowExecution struct {
-	ID                uuid.UUID               `json:"id" gorm:"type:uuid;primaryKey"`
-	WorkflowID        uuid.UUID               `json:"workflow_id" gorm:"type:uuid;index"`
-	ScheduledID       *uuid.UUID              `json:"scheduled_id" gorm:"type:uuid;index"`
-	PageID            *uuid.UUID              `json:"page_id,omitempty" gorm:"type:uuid;index"`
-	TriggerSource     string                  `json:"trigger_source" gorm:"size:50;index"` // MANUAL, PAGE, SCHEDULE, HOOK
-	Status            Status                  `json:"status"`
-	Inputs            string                  `json:"inputs"` // JSON string
-	ExecutedBy        *uuid.UUID              `json:"executed_by" gorm:"type:uuid;index"`
-	APIKeyID          *uuid.UUID              `json:"api_key_id,omitempty" gorm:"type:uuid;index"`
-	User              *User                   `json:"user,omitempty" gorm:"foreignKey:ExecutedBy"`
-	LogPath           string                  `json:"log_path"`
+	ID            uuid.UUID  `json:"id" gorm:"type:uuid;primaryKey"`
+	WorkflowID    uuid.UUID  `json:"workflow_id" gorm:"type:uuid;index"`
+	ScheduledID   *uuid.UUID `json:"scheduled_id" gorm:"type:uuid;index"`
+	PageID        *uuid.UUID `json:"page_id,omitempty" gorm:"type:uuid;index"`
+	TriggerSource string     `json:"trigger_source" gorm:"size:50;index"` // MANUAL, PAGE, SCHEDULE, HOOK
+	Status        Status     `json:"status"`
+	Inputs        string     `json:"inputs"` // JSON string
+	ExecutedBy    *uuid.UUID `json:"executed_by" gorm:"type:uuid;index"`
+	APIKeyID      *uuid.UUID `json:"api_key_id,omitempty" gorm:"type:uuid;index"`
+	User          *User      `json:"user,omitempty" gorm:"foreignKey:ExecutedBy"`
+	LogPath       string     `json:"log_path"`
 	// Result holds the JSON envelope produced from the workflow's declared outputs:
 	// {"status":"success|failed","result":{"<output key>":<value>}}. Empty when the
 	// workflow declares no outputs. Consumed by parent WORKFLOW steps and result widgets.
