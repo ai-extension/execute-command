@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
-import { Zap, Shield, Lock, User as UserIcon, ArrowRight, Loader2, Mail } from 'lucide-react';
-import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
+import { Zap, Shield, Lock, User as UserIcon, ArrowRight, ArrowLeft, Loader2, Mail } from 'lucide-react';
 import { API_BASE_URL } from '../lib/api';
 import { cn } from '../lib/utils';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
+import AuthMethodChooser from '../components/auth/AuthMethodChooser';
 
 const LoginPage = () => {
     const [username, setUsername] = useState('');
@@ -17,6 +17,9 @@ const LoginPage = () => {
     const [allowRegistration, setAllowRegistration] = useState(false);
     const [googleEnabled, setGoogleEnabled] = useState(false);
     const [googleClientId, setGoogleClientId] = useState('');
+    const [settingsLoaded, setSettingsLoaded] = useState(false);
+    // 'choose' lists the sign-in methods; 'credentials' reveals the username form.
+    const [mode, setMode] = useState<'choose' | 'credentials'>('choose');
     const [facebookEnabled, setFacebookEnabled] = useState(false);
     const { login, showToast } = useAuth();
     const navigate = useNavigate();
@@ -34,10 +37,27 @@ const LoginPage = () => {
                 }
             } catch (err) {
                 console.error("Failed to fetch public settings", err);
+            } finally {
+                setSettingsLoaded(true);
             }
         };
         fetchSettings();
     }, []);
+
+    const hasSocialOption = (googleEnabled && !!googleClientId) || facebookEnabled;
+    // With no social provider configured there is nothing to choose between, so the
+    // form is the whole screen.
+    const activeMode = hasSocialOption ? mode : 'credentials';
+
+    const showCredentials = () => {
+        setError('');
+        setMode('credentials');
+    };
+
+    const showChooser = () => {
+        setError('');
+        setMode('choose');
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -137,6 +157,53 @@ const LoginPage = () => {
                 {/* Login Card */}
                 <Card className="bg-[#0f0f0f]/80 border-white/5 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] rounded-md overflow-hidden backdrop-blur-3xl ring-1 ring-white/10 hover:ring-white/20 transition-all duration-500 group">
                     <CardContent className="p-10">
+                        {!settingsLoaded && (
+                            <div className="flex justify-center py-10">
+                                <Loader2 className="w-6 h-6 animate-spin text-primary/60" />
+                            </div>
+                        )}
+
+                        {settingsLoaded && activeMode === 'choose' && (
+                            <div key="chooser" className="auth-panel-in-left space-y-6">
+                                <div className="text-center space-y-1">
+                                    <h2 className="text-sm font-black uppercase tracking-[0.25em] text-white/90">Choose access</h2>
+                                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/40">Pick how you want to sign in</p>
+                                </div>
+
+                                <AuthMethodChooser
+                                    googleEnabled={googleEnabled}
+                                    googleClientId={googleClientId}
+                                    facebookEnabled={facebookEnabled}
+                                    onGoogleCredential={handleGoogleCredential}
+                                    onGoogleError={() => setError('Google login failed')}
+                                    onFacebook={() => handleSocialLogin('Facebook')}
+                                    onUseAccount={showCredentials}
+                                    disabled={isLoading}
+                                />
+
+                                {error && (
+                                    <div className="bg-destructive/5 border border-destructive/20 p-4 rounded-md flex items-center gap-3">
+                                        <div className="p-1.5 rounded-full bg-destructive/10">
+                                            <Shield className="w-3.5 h-3.5 text-destructive" />
+                                        </div>
+                                        <p className="text-xs font-bold text-destructive leading-tight">{error}</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {settingsLoaded && activeMode === 'credentials' && (
+                        <div key="credentials" className="auth-panel-in-right">
+                        {hasSocialOption && (
+                            <button
+                                type="button"
+                                onClick={showChooser}
+                                className="mb-6 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/50 hover:text-primary transition-colors group"
+                            >
+                                <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-1 transition-transform" />
+                                Other methods
+                            </button>
+                        )}
                         <form onSubmit={handleSubmit} className="space-y-6">
                             <div className="space-y-2 group/input">
                                 <label className="text-[10px] font-bold uppercase tracking-[0.25em] text-muted-foreground/70 ml-1 transition-colors group-focus-within/input:text-primary/90">
@@ -197,49 +264,7 @@ const LoginPage = () => {
                                 )}
                             </Button>
                         </form>
-
-                        {/* Social Auth Section */}
-                        {((googleEnabled && googleClientId) || facebookEnabled) && (
-                            <div className="mt-10 space-y-6">
-                                <div className="relative">
-                                    <div className="absolute inset-0 flex items-center">
-                                        <span className="w-full border-t border-white/5"></span>
-                                    </div>
-                                    <div className="relative flex justify-center text-[10px] uppercase font-black tracking-[0.3em]">
-                                        <span className="bg-[#0f0f0f] px-4 text-muted-foreground/30">Connect via</span>
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center justify-center gap-8">
-                                    {googleEnabled && googleClientId && (
-                                        <GoogleOAuthProvider clientId={googleClientId}>
-                                            <div className="[color-scheme:light]">
-                                                <GoogleLogin
-                                                    onSuccess={(response) => handleGoogleCredential(response.credential)}
-                                                    onError={() => setError('Google login failed')}
-                                                    theme="filled_black"
-                                                    shape="pill"
-                                                    text="continue_with"
-                                                    width="280"
-                                                />
-                                            </div>
-                                        </GoogleOAuthProvider>
-                                    )}
-                                    {facebookEnabled && (
-                                        <button
-                                            type="button"
-                                            onClick={() => handleSocialLogin('Facebook')}
-                                            className="group relative flex items-center justify-center w-16 h-16 rounded-md bg-[#1877F2]/5 border border-[#1877F2]/10 hover:bg-[#1877F2]/20 hover:border-[#1877F2]/30 hover:scale-110 transition-all duration-500 shadow-2xl overflow-hidden ring-1 ring-[#1877F2]/0 hover:ring-[#1877F2]/20"
-                                            title="Login with Facebook"
-                                        >
-                                            <div className="absolute inset-x-0 bottom-0 h-1 bg-[#1877F2] opacity-0 group-hover:opacity-100 transition-opacity" />
-                                            <svg className="w-7 h-7 text-[#1877F2] z-10 transition-transform duration-500 group-hover:-rotate-12" fill="currentColor" viewBox="0 0 24 24">
-                                                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-                                            </svg>
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
+                        </div>
                         )}
 
                         {/* Footer Section */}

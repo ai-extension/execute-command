@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Zap, Shield, Lock, User as UserIcon, ArrowRight, Loader2 } from 'lucide-react';
-import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
+import { Zap, Shield, Lock, User as UserIcon, ArrowRight, ArrowLeft, Loader2 } from 'lucide-react';
 import { API_BASE_URL } from '../lib/api';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
+import AuthMethodChooser from './auth/AuthMethodChooser';
 import {
     Dialog,
     DialogContent,
@@ -26,7 +26,11 @@ const LoginDialog: React.FC<LoginDialogProps> = ({ isOpen, onOpenChange, onSucce
     const [error, setError] = useState('');
     const [googleEnabled, setGoogleEnabled] = useState(false);
     const [googleClientId, setGoogleClientId] = useState('');
-    const { login } = useAuth();
+    const [facebookEnabled, setFacebookEnabled] = useState(false);
+    const [settingsLoaded, setSettingsLoaded] = useState(false);
+    // 'choose' lists the sign-in methods; 'credentials' reveals the username form.
+    const [mode, setMode] = useState<'choose' | 'credentials'>('choose');
+    const { login, showToast } = useAuth();
 
     // Only ask while the dialog is open: a public page renders this for visitors who
     // may never open it.
@@ -40,12 +44,25 @@ const LoginDialog: React.FC<LoginDialogProps> = ({ isOpen, onOpenChange, onSucce
                 const data = await response.json();
                 setGoogleEnabled(!!data.google_auth_enabled);
                 setGoogleClientId(data.google_client_id || '');
+                setFacebookEnabled(!!data.facebook_auth_enabled);
             } catch (err) {
                 console.error('Failed to fetch public settings', err);
+            } finally {
+                setSettingsLoaded(true);
             }
         };
         fetchSettings();
     }, [isOpen]);
+
+    // Every visit to the dialog starts at the chooser, never mid-flow from last time.
+    useEffect(() => {
+        if (!isOpen) return;
+        setMode('choose');
+        setError('');
+    }, [isOpen]);
+
+    const hasSocialOption = (googleEnabled && !!googleClientId) || facebookEnabled;
+    const activeMode = hasSocialOption ? mode : 'credentials';
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -131,6 +148,52 @@ const LoginDialog: React.FC<LoginDialogProps> = ({ isOpen, onOpenChange, onSucce
                         </div>
                     </DialogHeader>
 
+                    {!settingsLoaded && (
+                        <div className="flex justify-center py-8">
+                            <Loader2 className="w-6 h-6 animate-spin text-primary/60" />
+                        </div>
+                    )}
+
+                    {settingsLoaded && activeMode === 'choose' && (
+                        <div key="chooser" className="auth-panel-in-left space-y-5">
+                            <AuthMethodChooser
+                                googleEnabled={googleEnabled}
+                                googleClientId={googleClientId}
+                                facebookEnabled={facebookEnabled}
+                                onGoogleCredential={handleGoogleCredential}
+                                onGoogleError={() => setError('Google login failed')}
+                                onFacebook={() => showToast('Facebook login is not available yet — only Google sign-in is wired up.', 'info')}
+                                onUseAccount={() => {
+                                    setError('');
+                                    setMode('credentials');
+                                }}
+                                disabled={isLoading}
+                            />
+
+                            {error && (
+                                <div className="bg-destructive/5 border border-destructive/20 p-3 rounded-md flex items-center gap-3">
+                                    <Shield className="w-3.5 h-3.5 text-destructive" />
+                                    <p className="text-[10px] font-bold text-destructive leading-tight">{error}</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {settingsLoaded && activeMode === 'credentials' && (
+                    <div key="credentials" className="auth-panel-in-right">
+                    {hasSocialOption && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setError('');
+                                setMode('choose');
+                            }}
+                            className="mb-5 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/50 hover:text-primary transition-colors group"
+                        >
+                            <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-1 transition-transform" />
+                            Other methods
+                        </button>
+                    )}
                     <form onSubmit={handleSubmit} className="space-y-6">
                         <div className="space-y-2 group/input">
                             <label className="text-[10px] font-bold uppercase tracking-[0.25em] text-muted-foreground/70 ml-1">
@@ -187,34 +250,9 @@ const LoginDialog: React.FC<LoginDialogProps> = ({ isOpen, onOpenChange, onSucce
                             )}
                         </Button>
                     </form>
-
-                    {googleEnabled && googleClientId && (
-                        <div className="mt-8 space-y-6">
-                            <div className="relative">
-                                <div className="absolute inset-0 flex items-center">
-                                    <span className="w-full border-t border-white/5"></span>
-                                </div>
-                                <div className="relative flex justify-center text-[10px] uppercase font-black tracking-[0.3em]">
-                                    <span className="bg-[#0f0f0f] px-4 text-muted-foreground/30">Connect via</span>
-                                </div>
-                            </div>
-
-                            <div className="flex items-center justify-center">
-                                <GoogleOAuthProvider clientId={googleClientId}>
-                                    <div className="[color-scheme:light]">
-                                        <GoogleLogin
-                                            onSuccess={(response) => handleGoogleCredential(response.credential)}
-                                            onError={() => setError('Google login failed')}
-                                            theme="filled_black"
-                                            shape="pill"
-                                            text="continue_with"
-                                            width="280"
-                                        />
-                                    </div>
-                                </GoogleOAuthProvider>
-                            </div>
-                        </div>
+                    </div>
                     )}
+
                 </div>
             </DialogContent>
         </Dialog>
