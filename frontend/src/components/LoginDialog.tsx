@@ -49,7 +49,7 @@ const LoginDialog: React.FC<LoginDialogProps> = ({ isOpen, onOpenChange, onSucce
                 setGoogleClientId(data.google_client_id || '');
                 setFacebookEnabled(!!data.facebook_auth_enabled);
                 setSiteTitle(data.site_title || '');
-                setSiteLogo(data.site_logo || '');
+                setSiteLogo(data.has_site_logo ? `${API_BASE_URL}/settings/logo` : '');
             } catch (err) {
                 console.error('Failed to fetch public settings', err);
             } finally {

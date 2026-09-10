@@ -213,6 +213,7 @@ func main() {
 
 		// Public Settings (e.g. for registration status)
 		api.GET("/settings/public", settingsHandler.GetPublicSettings)
+		api.GET("/settings/logo", settingsHandler.GetSiteLogo)
 
 		// Protected routes
 		protected := api.Group("")

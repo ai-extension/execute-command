@@ -37,7 +37,7 @@ const LoginPage = () => {
                     setGoogleEnabled(data.google_auth_enabled);
                     setGoogleClientId(data.google_client_id || '');
                     setSiteTitle(data.site_title || '');
-                    setSiteLogo(data.site_logo || '');
+                    setSiteLogo(data.has_site_logo ? `${API_BASE_URL}/settings/logo` : '');
                     setFacebookEnabled(data.facebook_auth_enabled);
                 }
             } catch (err) {
