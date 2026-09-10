@@ -10,7 +10,7 @@ import (
 	"github.com/user/csm-backend/internal/domain"
 )
 
-// domainPattern accepts a bare DNS name such as "air-closet.com"; anything with a
+// domainPattern accepts a bare DNS name such as "example.com"; anything with a
 // scheme, path, "@" or wildcard would silently never match a Google `hd` claim.
 var domainPattern = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$`)
 

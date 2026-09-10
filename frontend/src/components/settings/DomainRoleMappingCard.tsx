@@ -264,7 +264,7 @@ const DomainRoleMappingCard = () => {
                         <div className="space-y-2">
                             <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 ml-1">Company Domain</label>
                             <Input
-                                placeholder="e.g. air-closet.com"
+                                placeholder="e.g. example.com"
                                 className="h-9 bg-muted/30 border-border rounded-md font-bold text-sm"
                                 value={form.domain}
                                 onChange={(e) => setForm((prev) => ({ ...prev, domain: e.target.value }))}

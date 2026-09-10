@@ -161,8 +161,8 @@ func enabledMapping(domainName string) *domain.DomainRoleMapping {
 }
 
 func TestLoginWithGoogleProvisionsUserAndAssignsMappedRole(t *testing.T) {
-	f := newFixture(t, enabledMapping("air-closet.com"),
-		workspacePayload("sub-1", "dee@air-closet.com", "air-closet.com", true), nil)
+	f := newFixture(t, enabledMapping("example.com"),
+		workspacePayload("sub-1", "alice@example.com", "example.com", true), nil)
 
 	_, user, err := f.svc.LoginWithGoogle(context.Background(), "token")
 	if err != nil {
@@ -178,7 +178,7 @@ func TestLoginWithGoogleProvisionsUserAndAssignsMappedRole(t *testing.T) {
 }
 
 func TestLoginWithGoogleRejectsUnmappedDomain(t *testing.T) {
-	f := newFixture(t, enabledMapping("air-closet.com"),
+	f := newFixture(t, enabledMapping("example.com"),
 		workspacePayload("sub-2", "someone@other.com", "other.com", true), nil)
 
 	if _, _, err := f.svc.LoginWithGoogle(context.Background(), "token"); !errors.Is(err, ErrDomainNotAllowed) {
@@ -192,8 +192,8 @@ func TestLoginWithGoogleRejectsUnmappedDomain(t *testing.T) {
 func TestLoginWithGoogleRejectsConsumerAccountWithoutHostedDomain(t *testing.T) {
 	// A consumer Google account registered with a company address carries no `hd`
 	// claim and is not managed by the company.
-	f := newFixture(t, enabledMapping("air-closet.com"),
-		workspacePayload("sub-3", "dee@air-closet.com", "", true), nil)
+	f := newFixture(t, enabledMapping("example.com"),
+		workspacePayload("sub-3", "alice@example.com", "", true), nil)
 
 	if _, _, err := f.svc.LoginWithGoogle(context.Background(), "token"); !errors.Is(err, ErrDomainNotAllowed) {
 		t.Fatalf("expected ErrDomainNotAllowed, got %v", err)
@@ -201,9 +201,9 @@ func TestLoginWithGoogleRejectsConsumerAccountWithoutHostedDomain(t *testing.T) 
 }
 
 func TestLoginWithGoogleAllowsConsumerAccountWhenMappingOptsIn(t *testing.T) {
-	mapping := enabledMapping("air-closet.com")
+	mapping := enabledMapping("example.com")
 	mapping.AllowNonWorkspace = true
-	f := newFixture(t, mapping, workspacePayload("sub-4", "dee@air-closet.com", "", true), nil)
+	f := newFixture(t, mapping, workspacePayload("sub-4", "alice@example.com", "", true), nil)
 
 	if _, _, err := f.svc.LoginWithGoogle(context.Background(), "token"); err != nil {
 		t.Fatalf("expected sign-in to succeed, got %v", err)
@@ -211,8 +211,8 @@ func TestLoginWithGoogleAllowsConsumerAccountWhenMappingOptsIn(t *testing.T) {
 }
 
 func TestLoginWithGoogleRejectsUnverifiedEmail(t *testing.T) {
-	f := newFixture(t, enabledMapping("air-closet.com"),
-		workspacePayload("sub-5", "dee@air-closet.com", "air-closet.com", false), nil)
+	f := newFixture(t, enabledMapping("example.com"),
+		workspacePayload("sub-5", "alice@example.com", "example.com", false), nil)
 
 	if _, _, err := f.svc.LoginWithGoogle(context.Background(), "token"); !errors.Is(err, ErrEmailNotVerified) {
 		t.Fatalf("expected ErrEmailNotVerified, got %v", err)
@@ -220,7 +220,7 @@ func TestLoginWithGoogleRejectsUnverifiedEmail(t *testing.T) {
 }
 
 func TestLoginWithGoogleRejectsInvalidToken(t *testing.T) {
-	f := newFixture(t, enabledMapping("air-closet.com"), nil, errors.New("bad signature"))
+	f := newFixture(t, enabledMapping("example.com"), nil, errors.New("bad signature"))
 
 	if _, _, err := f.svc.LoginWithGoogle(context.Background(), "token"); !errors.Is(err, ErrInvalidGoogleToken) {
 		t.Fatalf("expected ErrInvalidGoogleToken, got %v", err)
@@ -228,10 +228,10 @@ func TestLoginWithGoogleRejectsInvalidToken(t *testing.T) {
 }
 
 func TestLoginWithGoogleLinksExistingLocalAccountInsteadOfDuplicating(t *testing.T) {
-	f := newFixture(t, enabledMapping("air-closet.com"),
-		workspacePayload("sub-6", "dee@air-closet.com", "air-closet.com", true), nil)
+	f := newFixture(t, enabledMapping("example.com"),
+		workspacePayload("sub-6", "alice@example.com", "example.com", true), nil)
 
-	existing := &domain.User{ID: uuid.New(), Username: "dee", Email: "dee@air-closet.com", PasswordHash: "hash"}
+	existing := &domain.User{ID: uuid.New(), Username: "alice", Email: "alice@example.com", PasswordHash: "hash"}
 	f.users.byEmail[existing.Email] = existing
 
 	_, user, err := f.svc.LoginWithGoogle(context.Background(), "token")
@@ -244,7 +244,7 @@ func TestLoginWithGoogleLinksExistingLocalAccountInsteadOfDuplicating(t *testing
 	if len(f.users.created) != 0 {
 		t.Fatal("linking must not create a second account")
 	}
-	if user.Username != "dee" || user.PasswordHash != "hash" {
+	if user.Username != "alice" || user.PasswordHash != "hash" {
 		t.Fatal("linking must not overwrite the local credentials")
 	}
 	if _, assigned := f.users.setRoles[user.ID]; assigned {
@@ -253,11 +253,11 @@ func TestLoginWithGoogleLinksExistingLocalAccountInsteadOfDuplicating(t *testing
 }
 
 func TestLoginWithGoogleSyncsRolesWhenMappingRequestsIt(t *testing.T) {
-	mapping := enabledMapping("air-closet.com")
+	mapping := enabledMapping("example.com")
 	mapping.SyncOnLogin = true
-	f := newFixture(t, mapping, workspacePayload("sub-7", "dee@air-closet.com", "air-closet.com", true), nil)
+	f := newFixture(t, mapping, workspacePayload("sub-7", "alice@example.com", "example.com", true), nil)
 
-	existing := &domain.User{ID: uuid.New(), Username: "dee", Email: "dee@air-closet.com"}
+	existing := &domain.User{ID: uuid.New(), Username: "alice", Email: "alice@example.com"}
 	f.users.byEmail[existing.Email] = existing
 
 	if _, _, err := f.svc.LoginWithGoogle(context.Background(), "token"); err != nil {
@@ -269,9 +269,9 @@ func TestLoginWithGoogleSyncsRolesWhenMappingRequestsIt(t *testing.T) {
 }
 
 func TestLoginWithGoogleRefusesWhenProvisioningIsDisabled(t *testing.T) {
-	mapping := enabledMapping("air-closet.com")
+	mapping := enabledMapping("example.com")
 	mapping.AutoProvision = false
-	f := newFixture(t, mapping, workspacePayload("sub-8", "new@air-closet.com", "air-closet.com", true), nil)
+	f := newFixture(t, mapping, workspacePayload("sub-8", "new@example.com", "example.com", true), nil)
 
 	if _, _, err := f.svc.LoginWithGoogle(context.Background(), "token"); !errors.Is(err, ErrProvisioningDisabled) {
 		t.Fatalf("expected ErrProvisioningDisabled, got %v", err)
@@ -279,8 +279,8 @@ func TestLoginWithGoogleRefusesWhenProvisioningIsDisabled(t *testing.T) {
 }
 
 func TestLoginWithGoogleRefusesWhenDisabledOrUnconfigured(t *testing.T) {
-	f := newFixture(t, enabledMapping("air-closet.com"),
-		workspacePayload("sub-9", "dee@air-closet.com", "air-closet.com", true), nil)
+	f := newFixture(t, enabledMapping("example.com"),
+		workspacePayload("sub-9", "alice@example.com", "example.com", true), nil)
 
 	settings := &fakeSettingsRepo{values: map[string]string{"google_auth_enabled": "false"}}
 	f.svc.settings = NewSettingsService(settings)
@@ -297,8 +297,8 @@ func TestLoginWithGoogleRefusesWhenDisabledOrUnconfigured(t *testing.T) {
 func TestLoginWithGoogleRefusesWhenMappedRoleWasDeleted(t *testing.T) {
 	// Roles are soft-deleted, so GetByDomain still returns the mapping but cannot
 	// preload the role. Signing in would otherwise yield a session with no permissions.
-	mapping := enabledMapping("air-closet.com")
-	f := newFixture(t, mapping, workspacePayload("sub-11", "dee@air-closet.com", "air-closet.com", true), nil)
+	mapping := enabledMapping("example.com")
+	f := newFixture(t, mapping, workspacePayload("sub-11", "alice@example.com", "example.com", true), nil)
 	mapping.Role = nil
 
 	if _, _, err := f.svc.LoginWithGoogle(context.Background(), "token"); !errors.Is(err, ErrMappingRoleMissing) {
@@ -312,11 +312,11 @@ func TestLoginWithGoogleRefusesWhenMappedRoleWasDeleted(t *testing.T) {
 func TestLoginWithGoogleRefusesAccountOwnedByAnotherGoogleIdentity(t *testing.T) {
 	// The address was reassigned to a new employee: inheriting the previous holder's
 	// account and roles must be an administrative act, not a silent side effect.
-	f := newFixture(t, enabledMapping("air-closet.com"),
-		workspacePayload("new-sub", "shared@air-closet.com", "air-closet.com", true), nil)
+	f := newFixture(t, enabledMapping("example.com"),
+		workspacePayload("new-sub", "shared@example.com", "example.com", true), nil)
 
 	previous := &domain.User{
-		ID: uuid.New(), Username: "shared@air-closet.com", Email: "shared@air-closet.com",
+		ID: uuid.New(), Username: "shared@example.com", Email: "shared@example.com",
 		SocialProvider: googleProvider, SocialID: "old-sub",
 	}
 	f.users.byEmail[previous.Email] = previous
@@ -330,9 +330,9 @@ func TestLoginWithGoogleRefusesAccountOwnedByAnotherGoogleIdentity(t *testing.T)
 }
 
 func TestLoginWithGoogleRejectsDisabledMapping(t *testing.T) {
-	mapping := enabledMapping("air-closet.com")
+	mapping := enabledMapping("example.com")
 	mapping.Enabled = false
-	f := newFixture(t, mapping, workspacePayload("sub-10", "dee@air-closet.com", "air-closet.com", true), nil)
+	f := newFixture(t, mapping, workspacePayload("sub-10", "alice@example.com", "example.com", true), nil)
 
 	if _, _, err := f.svc.LoginWithGoogle(context.Background(), "token"); !errors.Is(err, ErrDomainNotAllowed) {
 		t.Fatalf("expected ErrDomainNotAllowed, got %v", err)
@@ -340,15 +340,15 @@ func TestLoginWithGoogleRejectsDisabledMapping(t *testing.T) {
 }
 
 func TestRegisterRefusesAddressInAGoogleMappedDomain(t *testing.T) {
-	// Registering as boss@air-closet.com would pre-claim the account that the real
+	// Registering as boss@example.com would pre-claim the account that the real
 	// boss's first Google sign-in links to.
-	mapping := enabledMapping("air-closet.com")
+	mapping := enabledMapping("example.com")
 	mappings := &fakeMappingRepo{byDomain: map[string]*domain.DomainRoleMapping{mapping.Domain: mapping}}
 	users := newFakeUserRepo()
 	settings := &fakeSettingsRepo{values: map[string]string{"allow_registration": "true"}}
 	auth := NewAuthService(users, settings, mappings)
 
-	if _, err := auth.Register("mallory", "secret123", "boss@air-closet.com"); err == nil {
+	if _, err := auth.Register("mallory", "secret123", "boss@example.com"); err == nil {
 		t.Fatal("expected registration in a mapped domain to be refused")
 	}
 	if len(users.created) != 0 {
