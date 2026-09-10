@@ -115,7 +115,7 @@ const PublicPageView = () => {
             });
             if (!res.ok) return;
             const data = await res.json();
-            const statuses: { id: string; status: string }[] = data.statuses || [];
+            const statuses: { id: string; status: string; executed_by?: string }[] = data.statuses || [];
             const resolved = statuses.filter(s => s.status && s.status !== 'RUNNING');
             if (resolved.length === 0) return;
             setHistoryMap(prev => {
@@ -123,7 +123,7 @@ const PublicPageView = () => {
                 resolved.forEach(s => {
                     Object.keys(next).forEach(widgetId => {
                         if (next[widgetId].some(e => e.executionId === s.id)) {
-                            next = updateEntryStatus(next, widgetId, s.id, s.status);
+                            next = updateEntryStatus(next, widgetId, s.id, s.status, s.executed_by);
                         }
                     });
                 });
@@ -403,6 +403,7 @@ const PublicPageView = () => {
                         inputs,
                         status: 'RUNNING',
                         timestamp: Date.now(),
+                        executedBy: data.executed_by || undefined,
                     };
                     setHistoryMap(prev => appendEntry(prev, entry));
                 }

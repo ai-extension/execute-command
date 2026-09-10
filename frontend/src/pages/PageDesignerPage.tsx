@@ -393,7 +393,7 @@ const PageDesignerPage = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const { activeNamespace } = useNamespace();
-    const { apiFetch, hasPermission } = useAuth();
+    const { apiFetch, hasPermission, showToast } = useAuth();
 
     // Page meta
     const [title, setTitle] = useState('');
@@ -551,7 +551,13 @@ const PageDesignerPage = () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body),
             });
-            if (r.ok) navigate('/pages');
+            if (r.ok) {
+                // Stay in the designer: saving is a checkpoint mid-edit, not the end of it.
+                showToast('Page saved', 'success');
+                // A freshly typed password is now stored, so mark it as such — otherwise
+                // the next save would resend it, and clearing the field would wipe it.
+                if (password && password !== '********') setPassword('********');
+            }
         } catch { /* ignore */ } finally {
             setIsSaving(false);
         }

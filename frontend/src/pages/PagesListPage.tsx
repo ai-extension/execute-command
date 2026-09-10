@@ -5,7 +5,7 @@ import { Layout, Plus, Search, MoreVertical, Edit2, Trash2, Globe, Lock, Chevron
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
-import { cn } from '../lib/utils';
+import { cn, copyToClipboard } from '../lib/utils';
 import { Page, Tag } from '../types';
 import { useNamespace } from '../context/NamespaceContext';
 import { useAuth } from '../context/AuthContext';
@@ -20,7 +20,7 @@ import { useUsers } from '../hooks/useUsers';
 const PagesListPage = () => {
     const navigate = useNavigate();
     const { activeNamespace } = useNamespace();
-    const { apiFetch } = useAuth();
+    const { apiFetch, showToast } = useAuth();
 
     const [pages, setPages] = useState<Page[]>([]);
     const [total, setTotal] = useState(0);
@@ -108,6 +108,14 @@ const PagesListPage = () => {
 
     const handleCreatePage = () => {
         setIsTemplateDialogOpen(true);
+    };
+
+    // The public link is what gets pasted into chat or a ticket, so it is worth one click
+    // from the list rather than opening the page first.
+    const handleCopyPublicLink = async (slug: string) => {
+        const url = `${window.location.origin}/public/pages/${slug}`;
+        const copied = await copyToClipboard(url);
+        showToast(copied ? 'Public link copied' : 'Could not copy the link', copied ? 'success' : 'error');
     };
 
     const handleCreateFromTemplate = async (title: string, slug: string, template: PageTemplate) => {
@@ -338,6 +346,16 @@ const PagesListPage = () => {
                                         <Button
                                             variant="outline"
                                             size="sm"
+                                            title="Copy public link"
+                                            className="h-8 px-3 text-[10px] font-bold uppercase tracking-widest rounded-md"
+                                            onClick={() => handleCopyPublicLink(page.slug)}
+                                        >
+                                            <Copy className="w-3 h-3" />
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            title="Open public page"
                                             className="h-8 px-3 text-[10px] font-bold uppercase tracking-widest rounded-md"
                                             onClick={() => window.open(`/public/pages/${page.slug}`, '_blank')}
                                         >

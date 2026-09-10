@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Zap, Play, Loader2, CheckCircle2, AlertTriangle, Square, History, RotateCcw, XCircle, Clock, FileText, CalendarClock, Trash2, Repeat } from 'lucide-react';
+import { Zap, Play, Loader2, CheckCircle2, AlertTriangle, Square, History, RotateCcw, XCircle, Clock, FileText, CalendarClock, Trash2, Repeat, UserRound } from 'lucide-react';
 import { WidgetIcon } from '../../lib/widgetIcons';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -49,9 +49,9 @@ const formatInputs = (inputs: Record<string, string>) => {
 // One shape for every widget action, so a run, a stop and a schedule button no longer
 // disagree on height, radius and hover feedback. Hover changes brightness, never hue:
 // repainting a green button violet was the old default-variant behaviour.
-const WIDGET_PRIMARY_ACTION = "h-14 rounded-md font-black text-xs transition-all active:scale-[0.98]";
-const WIDGET_SQUARE_ACTION = "h-14 w-14 shrink-0 rounded-md flex items-center justify-center transition-all active:scale-[0.98]";
-const WIDGET_ICON_ACTION = "h-9 w-9 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors border border-transparent hover:border-border";
+const WIDGET_PRIMARY_ACTION = "h-14 rounded-md font-black text-xs transition-all active:scale-[0.98] cursor-pointer disabled:cursor-default";
+const WIDGET_SQUARE_ACTION = "h-14 w-14 shrink-0 rounded-md flex items-center justify-center transition-all active:scale-[0.98] cursor-pointer disabled:cursor-default";
+const WIDGET_ICON_ACTION = "h-9 w-9 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors border border-transparent hover:border-border cursor-pointer";
 
 const EndpointWidget: React.FC<EndpointWidgetProps> = ({
     widget,
@@ -347,9 +347,17 @@ const EndpointWidget: React.FC<EndpointWidgetProps> = ({
                                             <Icon className={cn("w-3.5 h-3.5", entry.status === 'RUNNING' && 'animate-spin')} />
                                             <span className="text-[10px] font-black uppercase tracking-wider">{entry.status}</span>
                                         </div>
-                                        <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                                            <Clock className="w-3 h-3" />
-                                            <span>{formatTime(entry.timestamp)}</span>
+                                        <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+                                            {entry.executedBy && (
+                                                <span className="flex items-center gap-1">
+                                                    <UserRound className="w-3 h-3" />
+                                                    <span className="font-bold">{entry.executedBy}</span>
+                                                </span>
+                                            )}
+                                            <span className="flex items-center gap-1">
+                                                <Clock className="w-3 h-3" />
+                                                <span>{formatTime(entry.timestamp)}</span>
+                                            </span>
                                         </div>
                                     </div>
                                     <div className="text-xs text-muted-foreground break-all">

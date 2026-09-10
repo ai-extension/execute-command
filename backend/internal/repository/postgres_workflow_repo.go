@@ -750,7 +750,8 @@ func (r *PostgresWorkflowExecutionRepo) GetStatusesByIDs(ids []uuid.UUID) ([]dom
 	}
 	var execs []domain.WorkflowExecution
 	err := r.db.
-		Select("id", "workflow_id", "status", "finished_at").
+		Select("id", "workflow_id", "status", "finished_at", "executed_by").
+		Preload("User").
 		Where("id IN ?", ids).
 		Find(&execs).Error
 	return execs, err
