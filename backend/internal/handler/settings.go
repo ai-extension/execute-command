@@ -2,11 +2,18 @@ package handler
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/user/csm-backend/internal/domain"
 	"github.com/user/csm-backend/internal/service"
 )
+
+// secretSettingKeys are settings whose value is a credential: writable, never readable.
+var secretSettingKeys = map[string]bool{
+	"google_client_secret":   true,
+	"facebook_client_secret": true,
+}
 
 type SettingsHandler struct {
 	settingsService *service.SettingsService
@@ -26,6 +33,11 @@ func (h *SettingsHandler) GetSettings(c *gin.Context) {
 
 	result := make(map[string]string)
 	for _, s := range settings {
+		if secretSettingKeys[s.Key] {
+			// Never hand a stored secret back; the UI only needs to know one exists.
+			result["has_"+s.Key] = strconv.FormatBool(s.Value != "")
+			continue
+		}
 		result[s.Key] = s.Value
 	}
 

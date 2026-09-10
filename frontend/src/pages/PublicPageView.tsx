@@ -115,15 +115,17 @@ const PublicPageView = () => {
             });
             if (!res.ok) return;
             const data = await res.json();
-            const statuses: { id: string; status: string }[] = data.statuses || [];
-            const resolved = statuses.filter(s => s.status && s.status !== 'RUNNING');
-            if (resolved.length === 0) return;
+            const statuses: { id: string; status: string; executed_by?: string }[] = data.statuses || [];
+            // Apply every reported status, not just finished ones: a run started in
+            // another browser is still RUNNING here and only this reply carries its runner.
+            const reported = statuses.filter(s => s.status);
+            if (reported.length === 0) return;
             setHistoryMap(prev => {
                 let next = prev;
-                resolved.forEach(s => {
+                reported.forEach(s => {
                     Object.keys(next).forEach(widgetId => {
                         if (next[widgetId].some(e => e.executionId === s.id)) {
-                            next = updateEntryStatus(next, widgetId, s.id, s.status);
+                            next = updateEntryStatus(next, widgetId, s.id, s.status, s.executed_by);
                         }
                     });
                 });
@@ -403,6 +405,7 @@ const PublicPageView = () => {
                         inputs,
                         status: 'RUNNING',
                         timestamp: Date.now(),
+                        executedBy: data.executed_by || undefined,
                     };
                     setHistoryMap(prev => appendEntry(prev, entry));
                 }
@@ -616,7 +619,7 @@ const PublicPageView = () => {
                                 }
                                 if (widget.type === 'LINK') {
                                     return (
-                                        <div className="group bg-card border border-border rounded-md overflow-hidden hover:border-indigo-500/40 transition-all shadow-sm h-full flex flex-col">
+                                        <div className="group bg-card border border-border rounded-md overflow-hidden hover:border-foreground/20 transition-all shadow-sm h-full flex flex-col">
                                             <div className="flex items-center gap-4 px-8 py-4 border-b border-border bg-card">
                                                 <div className="p-2.5 rounded-md bg-indigo-500/10 text-indigo-500 ring-1 ring-indigo-500/20">
                                                     <WidgetIcon name={widget.icon} fallback={Link2} className="w-4 h-4" />
@@ -634,7 +637,7 @@ const PublicPageView = () => {
                                                     return (
                                                         <a href={widget.url || '#'} target={widget.new_tab ? "_blank" : "_self"} rel="noreferrer"
                                                             style={r.style}
-                                                            className={cn("h-14 w-full rounded-md flex items-center justify-center text-white font-black text-[10px] shadow-sm cursor-pointer transition-all hover:scale-[1.02]", r.className)}>
+                                                            className={cn("h-14 w-full rounded-md flex items-center justify-center text-white font-black text-[10px] shadow-sm cursor-pointer transition-all active:scale-[0.98] hover:brightness-110", r.className)}>
                                                             <Link2 className="w-4 h-4 mr-2" />
                                                             {widget.label || 'OPEN LINK'}
                                                         </a>

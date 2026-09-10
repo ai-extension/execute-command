@@ -68,6 +68,21 @@ func (s *VpnConfigService) Update(vpn *domain.VpnConfig, user *domain.User) erro
 	vpn.CreatedAt = existing.CreatedAt
 	vpn.NamespaceID = existing.NamespaceID // preserve namespace on update
 
+	// Credentials are never sent back to clients, so an omitted secret means "unchanged"
+	// rather than "clear it" — Save would otherwise wipe the stored value.
+	if vpn.Password == "" {
+		vpn.Password = existing.Password
+	}
+	if vpn.PrivateKey == "" {
+		vpn.PrivateKey = existing.PrivateKey
+	}
+	if vpn.ConfigFile == "" {
+		vpn.ConfigFile = existing.ConfigFile
+	}
+	if vpn.SharedKey == "" {
+		vpn.SharedKey = existing.SharedKey
+	}
+
 	return s.repo.Update(vpn)
 }
 

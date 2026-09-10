@@ -150,3 +150,43 @@
     scrollbar-width: thin;
     scrollbar-color: rgba(255, 255, 255, 0.05) transparent;
 }
+
+/* Auth surfaces switch between a method chooser and the credentials form. The
+   `animate-in` utilities used elsewhere in this app come from a plugin that is not
+   installed, so the keyframes live here instead of silently doing nothing. */
+@keyframes auth-panel-in-right {
+    from {
+        opacity: 0;
+        transform: translateX(18px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes auth-panel-in-left {
+    from {
+        opacity: 0;
+        transform: translateX(-18px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.auth-panel-in-right {
+    animation: auth-panel-in-right 0.26s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.auth-panel-in-left {
+    animation: auth-panel-in-left 0.26s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .auth-panel-in-right,
+    .auth-panel-in-left {
+        animation: none;
+    }
+}

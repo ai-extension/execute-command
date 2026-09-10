@@ -140,6 +140,9 @@ func (h *ServerHandler) UpdateServer(c *gin.Context) {
 		diff = utils.CalculateDiff(existing, &server)
 	}
 
+	diff = markCredentialChange(diff, "password", server.Password != "")
+	diff = markCredentialChange(diff, "private_key", server.PrivateKey != "")
+
 	if err := h.service.UpdateServer(&server, user); err != nil {
 		var meta map[string]interface{}
 		if diff != nil {
@@ -246,7 +249,7 @@ func (h *ServerHandler) TestHttp(c *gin.Context) {
 
 	// Convert headers map to JSON string for ExecuteHttp
 	headersJSON, _ := json.Marshal(req.HttpHeaders)
-	
+
 	output, err := h.service.ExecuteHttp(c.Request.Context(), id, method, req.HttpUrl, req.HttpBody, string(headersJSON), user, nil)
 	if err != nil {
 		h.auditLog.LogAction(c, "TEST_HTTP", "SERVER", resID, map[string]string{"url": req.HttpUrl, "error": err.Error()}, "FAILED")

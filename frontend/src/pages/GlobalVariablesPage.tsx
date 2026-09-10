@@ -12,6 +12,7 @@ import {
 } from '../components/ui/table';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
+import { Switch } from '../components/ui/switch';
 import { Badge } from '../components/ui/badge';
 import { cn, copyToClipboard as clipboardCopy } from '../lib/utils';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
@@ -70,7 +71,8 @@ const GlobalVariablesPage = () => {
     const [formData, setFormData] = useState({
         key: '',
         value: '',
-        description: ''
+        description: '',
+        is_secret: false
     });
 
     const fetchVariables = async () => {
@@ -114,7 +116,7 @@ const GlobalVariablesPage = () => {
             if (response.ok) {
                 await fetchVariables();
                 setIsCreateOpen(false);
-                setFormData({ key: '', value: '', description: '' });
+                setFormData({ key: '', value: '', description: '', is_secret: false });
             }
         } catch (error) {
             console.error('Failed to create global variable:', error);
@@ -137,7 +139,7 @@ const GlobalVariablesPage = () => {
                 await fetchVariables();
                 setIsEditOpen(false);
                 setSelectedVar(null);
-                setFormData({ key: '', value: '', description: '' });
+                setFormData({ key: '', value: '', description: '', is_secret: false });
             }
         } catch (error) {
             console.error('Failed to update global variable:', error);
@@ -172,8 +174,10 @@ const GlobalVariablesPage = () => {
         setSelectedVar(gv);
         setFormData({
             key: gv.key,
-            value: gv.value,
-            description: gv.description
+            // A secret value never comes back from the API; blank means "keep it".
+            value: gv.is_secret ? '' : gv.value,
+            description: gv.description,
+            is_secret: !!gv.is_secret
         });
         setIsEditOpen(true);
     };
@@ -192,7 +196,7 @@ const GlobalVariablesPage = () => {
                 </div>
                 <Dialog open={isCreateOpen} onOpenChange={(open) => {
                     setIsCreateOpen(open);
-                    if (!open) setFormData({ key: '', value: '', description: '' });
+                    if (!open) setFormData({ key: '', value: '', description: '', is_secret: false });
                 }}>
                     <DialogTrigger asChild>
                         <Button className="h-8 premium-gradient font-black uppercase tracking-widest text-[10px] px-4 shadow-premium rounded-md gap-2">
@@ -220,11 +224,21 @@ const GlobalVariablesPage = () => {
                             <div className="space-y-2">
                                 <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Value</Label>
                                 <Textarea
-                                    placeholder="Enter variable value... supports multi-line"
+                                    placeholder={formData.is_secret ? 'Stored — leave blank to keep it' : 'Enter variable value... supports multi-line'}
                                     className="min-h-[100px] bg-muted/30 border-border rounded-md font-medium resize-y"
                                     value={formData.value}
                                     onChange={(e) => setFormData({ ...formData, value: e.target.value })}
                                     required
+                                />
+                            </div>
+                            <div className="flex items-start justify-between gap-4 p-3 rounded-md border border-border bg-muted/10">
+                                <div className="space-y-1">
+                                    <h4 className="text-[10px] font-black uppercase tracking-widest text-white">Secret value</h4>
+                                    <p className="text-[10px] font-medium opacity-60 max-w-sm">Stored encrypted and never sent back to the browser. Workflows still resolve it normally.</p>
+                                </div>
+                                <Switch
+                                    checked={formData.is_secret}
+                                    onCheckedChange={(checked) => setFormData({ ...formData, is_secret: checked })}
                                 />
                             </div>
                             <div className="space-y-2">
@@ -318,7 +332,7 @@ const GlobalVariablesPage = () => {
                                 <TableCell>
                                     <div className="flex items-center gap-2 max-w-[300px]">
                                         <code className="px-3 py-1.5 rounded-md bg-muted text-xs font-bold text-slate-300 border border-border/50 truncate">
-                                            {v.value}
+                                            {v.is_secret ? (v.has_value ? '•••••••• (secret)' : '(empty)') : v.value}
                                         </code>
                                     </div>
                                 </TableCell>
@@ -433,11 +447,21 @@ const GlobalVariablesPage = () => {
                         <div className="space-y-2">
                             <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">New Value</Label>
                             <Textarea
-                                placeholder="Value..."
+                                placeholder={formData.is_secret ? 'Stored — leave blank to keep it' : 'Value...'}
                                 className="min-h-[100px] bg-muted/30 border-border rounded-md font-medium resize-y"
                                 value={formData.value}
                                 onChange={(e) => setFormData({ ...formData, value: e.target.value })}
-                                required
+                                required={!formData.is_secret}
+                            />
+                        </div>
+                        <div className="flex items-start justify-between gap-4 p-3 rounded-md border border-border bg-muted/10">
+                            <div className="space-y-1">
+                                <h4 className="text-[10px] font-black uppercase tracking-widest text-white">Secret value</h4>
+                                <p className="text-[10px] font-medium opacity-60 max-w-sm">Stored encrypted and never sent back to the browser. Turning this off re-exposes the stored value.</p>
+                            </div>
+                            <Switch
+                                checked={formData.is_secret}
+                                onCheckedChange={(checked) => setFormData({ ...formData, is_secret: checked })}
                             />
                         </div>
                         <div className="space-y-2">

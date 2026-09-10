@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Zap, Play, Loader2, CheckCircle2, AlertTriangle, Square, History, RotateCcw, XCircle, Clock, FileText, CalendarClock, Trash2, Repeat } from 'lucide-react';
+import { Zap, Play, Loader2, CheckCircle2, AlertTriangle, Square, History, RotateCcw, XCircle, Clock, FileText, CalendarClock, Trash2, Repeat, UserRound } from 'lucide-react';
 import { WidgetIcon } from '../../lib/widgetIcons';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -45,6 +45,13 @@ const formatInputs = (inputs: Record<string, string>) => {
     if (keys.length === 0) return '(no inputs)';
     return keys.map(k => `${k}: ${inputs[k]}`).join(' · ');
 };
+
+// One shape for every widget action, so a run, a stop and a schedule button no longer
+// disagree on height, radius and hover feedback. Hover changes brightness, never hue:
+// repainting a green button violet was the old default-variant behaviour.
+const WIDGET_PRIMARY_ACTION = "h-14 rounded-md font-black text-xs transition-all active:scale-[0.98] cursor-pointer disabled:cursor-default";
+const WIDGET_SQUARE_ACTION = "h-14 w-14 shrink-0 rounded-md flex items-center justify-center transition-all active:scale-[0.98] cursor-pointer disabled:cursor-default";
+const WIDGET_ICON_ACTION = "h-9 w-9 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors border border-transparent hover:border-border cursor-pointer";
 
 const EndpointWidget: React.FC<EndpointWidgetProps> = ({
     widget,
@@ -176,12 +183,12 @@ const EndpointWidget: React.FC<EndpointWidgetProps> = ({
 
     return (
         <div className={cn(
-            "p-8 bg-card border border-border rounded-md shadow-xl flex flex-col justify-between min-h-[260px] transition-all hover:border-primary/50 group w-full"
+            "p-8 bg-card border border-border rounded-md shadow-xl flex flex-col justify-between min-h-[260px] transition-all hover:border-foreground/20 group w-full"
         )}>
             <div>
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-4">
-                        <div className="p-2.5 rounded-md bg-primary/10 text-primary ring-1 ring-primary/20 group-hover:bg-primary group-hover:text-white transition-all duration-300">
+                        <div className="p-2.5 rounded-md bg-primary/10 text-primary ring-1 ring-primary/20">
                             <WidgetIcon name={widget.icon} fallback={Zap} className="w-4 h-4" />
                         </div>
                         <div>
@@ -195,7 +202,7 @@ const EndpointWidget: React.FC<EndpointWidgetProps> = ({
                                 <button
                                     type="button"
                                     onClick={() => triggerRerun(lastEntry.inputs)}
-                                    className="h-8 w-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors border border-transparent hover:border-primary/30"
+                                    className={WIDGET_ICON_ACTION}
                                 >
                                     <RotateCcw className="w-4 h-4" />
                                 </button>
@@ -213,7 +220,7 @@ const EndpointWidget: React.FC<EndpointWidgetProps> = ({
                                     onOpenHistory?.();
                                 }}
                                 title="View history & schedules"
-                                className="relative h-8 w-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors border border-transparent hover:border-border"
+                                className={cn("relative", WIDGET_ICON_ACTION)}
                             >
                                 <History className="w-4 h-4" />
                                 {hasHistory && (
@@ -235,9 +242,10 @@ const EndpointWidget: React.FC<EndpointWidgetProps> = ({
                     <div className="flex items-center gap-3">
                         <Button
                             disabled
+                            variant="plain"
                             style={styleResolved.style}
                             className={cn(
-                                "flex-1 h-16 rounded-md font-black text-xs shadow-premium transition-all",
+                                WIDGET_PRIMARY_ACTION, "flex-1 shadow-premium",
                                 styleResolved.className
                             )}
                         >
@@ -248,7 +256,8 @@ const EndpointWidget: React.FC<EndpointWidgetProps> = ({
                         </Button>
                         <Button
                             onClick={() => onStop && onStop(widget)}
-                            className="h-16 w-16 shrink-0 rounded-md bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/50 shadow-premium transition-all active:scale-[0.98] flex items-center justify-center group/stop"
+                            variant="plain"
+                            className={cn(WIDGET_SQUARE_ACTION, "bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/50 shadow-premium group/stop")}
                         >
                             <Square className="w-5 h-5 fill-current opacity-70 group-hover/stop:opacity-100 transition-opacity" />
                         </Button>
@@ -261,7 +270,7 @@ const EndpointWidget: React.FC<EndpointWidgetProps> = ({
                                     type="button"
                                     onClick={() => setScheduleOpen(true)}
                                     style={{ color: runAccent, borderColor: runAccent }}
-                                    className="h-16 w-16 shrink-0 rounded-xl flex flex-col items-center justify-center gap-1 border-2 bg-transparent transition-colors hover:bg-foreground/5"
+                                    className={cn(WIDGET_SQUARE_ACTION, "flex-col gap-1 border-2 bg-transparent hover:bg-foreground/5")}
                                 >
                                     <CalendarClock className="w-5 h-5" />
                                     <span className="text-[8px] font-black uppercase tracking-[0.15em]">Plan</span>
@@ -275,10 +284,11 @@ const EndpointWidget: React.FC<EndpointWidgetProps> = ({
                         <Button
                             onClick={() => onRun(widget)}
                             disabled={isRunning}
+                            variant="plain"
                             style={result ? undefined : styleResolved.style}
                             className={cn(
-                                "flex-1 h-16 rounded-md font-black text-xs shadow-premium transition-all active:scale-[0.98]",
-                                result ? (result.success ? "bg-emerald-500 hover:bg-emerald-600 text-white" : "bg-rose-500 hover:bg-rose-600 text-white") : styleResolved.className
+                                WIDGET_PRIMARY_ACTION, "flex-1 shadow-premium hover:brightness-110",
+                                result ? (result.success ? "bg-emerald-500 text-white" : "bg-rose-500 text-white") : styleResolved.className
                             )}
                         >
                             {result ? (
@@ -338,9 +348,17 @@ const EndpointWidget: React.FC<EndpointWidgetProps> = ({
                                             <Icon className={cn("w-3.5 h-3.5", entry.status === 'RUNNING' && 'animate-spin')} />
                                             <span className="text-[10px] font-black uppercase tracking-wider">{entry.status}</span>
                                         </div>
-                                        <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                                            <Clock className="w-3 h-3" />
-                                            <span>{formatTime(entry.timestamp)}</span>
+                                        <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+                                            {entry.executedBy && (
+                                                <span className="flex items-center gap-1">
+                                                    <UserRound className="w-3 h-3 text-emerald-500" />
+                                                    <span className="font-bold">{entry.executedBy}</span>
+                                                </span>
+                                            )}
+                                            <span className="flex items-center gap-1">
+                                                <Clock className="w-3 h-3 text-amber-500" />
+                                                <span>{formatTime(entry.timestamp)}</span>
+                                            </span>
                                         </div>
                                     </div>
                                     <div className="text-xs text-muted-foreground break-all">

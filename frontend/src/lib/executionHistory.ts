@@ -5,6 +5,8 @@ export interface ExecutionHistoryEntry {
     inputs: Record<string, string>;
     status: 'RUNNING' | 'SUCCESS' | 'FAILED' | 'CANCELLED' | string;
     timestamp: number;
+    /** Display name of whoever launched the run; absent for anonymous visitors. */
+    executedBy?: string;
 }
 
 const MAX_ENTRIES_PER_WIDGET = 10;
@@ -45,17 +47,20 @@ export const updateEntryStatus = (
     map: HistoryMap,
     widgetId: string,
     executionId: string,
-    status: ExecutionHistoryEntry['status']
+    status: ExecutionHistoryEntry['status'],
+    executedBy?: string
 ): HistoryMap => {
     const list = map[widgetId];
     if (!list) return map;
     let changed = false;
     const next = list.map(e => {
-        if (e.executionId === executionId && e.status !== status) {
-            changed = true;
-            return { ...e, status };
-        }
-        return e;
+        if (e.executionId !== executionId) return e;
+        // History lives in this browser, so a run started elsewhere only learns its
+        // runner when the server reports it back here.
+        const nextExecutedBy = executedBy || e.executedBy;
+        if (e.status === status && nextExecutedBy === e.executedBy) return e;
+        changed = true;
+        return { ...e, status, executedBy: nextExecutedBy };
     });
     if (!changed) return map;
     return { ...map, [widgetId]: next };

@@ -10,11 +10,17 @@ export interface VpnConfig {
     port: number;
     user?: string;
     auth_type?: 'PASSWORD' | 'PUBLIC_KEY';
+    // Credentials are write-only: the API accepts them but never returns them.
+    // The has_* flags report whether a value is stored.
     password?: string;
     private_key?: string;
     config_file?: string; // For OpenVPN (.ovpn) or WireGuard (.conf)
     public_key?: string;   // For WireGuard
     shared_key?: string;  // For WireGuard
+    has_password?: boolean;
+    has_private_key?: boolean;
+    has_config_file?: boolean;
+    has_shared_key?: boolean;
     created_by?: string;
     created_by_username?: string;
     created_at: string;
@@ -30,8 +36,11 @@ export interface Server {
     port: number;
     user: string;
     auth_type: 'PASSWORD' | 'PUBLIC_KEY';
+    // Write-only, as on VpnConfig.
     password?: string;
     private_key?: string;
+    has_password?: boolean;
+    has_private_key?: boolean;
     vpn_id?: string;
     vpn?: VpnConfig;
     created_by?: string;
@@ -203,7 +212,7 @@ export interface WorkflowExecution {
     status: Status;
     inputs: string;
     executed_by?: string;
-    user?: { id: string; username: string };
+    user?: { id: string; username: string; full_name?: string; email?: string };
     log_path: string;
     started_at: string;
     finished_at?: string;
@@ -282,7 +291,11 @@ export interface GlobalVariable {
     id: string;
     namespace_id: string;
     key: string;
+    // A secret variable's value is write-only: the API stores it encrypted and returns
+    // an empty string. has_value reports whether one is stored.
     value: string;
+    is_secret?: boolean;
+    has_value?: boolean;
     description: string;
     created_by?: string;
     created_by_username?: string;

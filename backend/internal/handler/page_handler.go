@@ -173,6 +173,7 @@ func (h *PageHandler) UpdatePage(c *gin.Context) {
 	c.Set("namespace_id", existing.NamespaceID)
 
 	diff := utils.CalculateDiff(existing, &page)
+	diff = markCredentialChange(diff, "password", page.Password != "")
 
 	if err := h.service.UpdatePage(&page, user); err != nil {
 		meta := diff
@@ -388,10 +389,14 @@ func (h *PageHandler) RunPublicWorkflow(c *gin.Context) {
 		return
 	}
 
+	// The public routes carry optional auth, so a signed-in visitor gets credited for the
+	// run instead of it being logged as "System".
+	runner := publicRequestUser(c)
+
 	execID := uuid.New()
 	go func() {
 		// Public run uses background context
-		h.executor.Run(context.Background(), workflowID, execID, inputReq.Inputs, nil, &page.ID, "PAGE", nil, nil, nil, nil)
+		h.executor.Run(context.Background(), workflowID, execID, inputReq.Inputs, nil, &page.ID, "PAGE", runner, nil, nil, nil)
 	}()
 
 	h.auditLog.LogAction(c, "RUN_WORKFLOW", "PAGE", page.ID.String(), map[string]string{"workflow_id": workflowID.String(), "execution_id": execID.String()}, "SUCCESS")
@@ -399,7 +404,35 @@ func (h *PageHandler) RunPublicWorkflow(c *gin.Context) {
 	c.JSON(http.StatusAccepted, gin.H{
 		"message":      "Workflow started",
 		"execution_id": execID,
+		"executed_by":  displayName(runner),
 	})
+}
+
+// publicRequestUser returns the signed-in user on a public route, or nil for an
+// anonymous visitor. The route runs OptionalAuthMiddleware, so both are expected.
+func publicRequestUser(c *gin.Context) *domain.User {
+	val, exists := c.Get("user")
+	if !exists {
+		return nil
+	}
+	user, _ := val.(*domain.User)
+	return user
+}
+
+// displayName is what a visitor sees as the runner of an execution: a real name when
+// the account has one, otherwise whatever identifies it — a Google account may carry
+// only an address.
+func displayName(user *domain.User) string {
+	if user == nil {
+		return ""
+	}
+	if user.FullName != "" {
+		return user.FullName
+	}
+	if user.Username != "" {
+		return user.Username
+	}
+	return user.Email
 }
 
 func (h *PageHandler) StopPublicExecution(c *gin.Context) {
@@ -585,7 +618,12 @@ func (h *PageHandler) GetPublicExecutionStatuses(c *gin.Context) {
 		ID         string     `json:"id"`
 		Status     string     `json:"status"`
 		FinishedAt *time.Time `json:"finished_at,omitempty"`
+		ExecutedBy string     `json:"executed_by,omitempty"`
 	}
+
+	// Who ran an execution is only told to a signed-in caller: an anonymous visitor of a
+	// public page has no business learning internal account names.
+	revealRunner := publicRequestUser(c) != nil
 	out := make([]statusItem, 0, len(ids))
 
 	if len(ids) > 0 {
@@ -602,11 +640,15 @@ func (h *PageHandler) GetPublicExecutionStatuses(c *gin.Context) {
 		}
 		for _, e := range execs {
 			if allowed[e.WorkflowID] {
-				out = append(out, statusItem{
+				item := statusItem{
 					ID:         e.ID.String(),
 					Status:     string(e.Status),
 					FinishedAt: e.FinishedAt,
-				})
+				}
+				if revealRunner {
+					item.ExecutedBy = displayName(e.User)
+				}
+				out = append(out, item)
 			}
 		}
 	}

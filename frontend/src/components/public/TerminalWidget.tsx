@@ -94,19 +94,19 @@ const TerminalWidget: React.FC<TerminalWidgetProps> = ({ widget, slug, pageToken
                     <div className="flex gap-1 mr-2">
                         <button
                             onClick={() => setIsVisible(false)}
-                            className="w-2.5 h-2.5 rounded-full bg-[#ff5f56] border border-[#e0443e] hover:bg-[#ff5f56]/80 transition-all flex items-center justify-center group/btn"
+                            className="w-2.5 h-2.5 rounded-full bg-[#ff5f56] border border-[#e0443e] hover:bg-[#ff5f56]/80 transition-all flex items-center justify-center group/btn cursor-pointer"
                         >
                             <X className="w-1.5 h-1.5 text-black opacity-0 group-hover/btn:opacity-100" />
                         </button>
                         <button
                             onClick={() => setWidgetState(widgetState === 'minimized' ? 'normal' : 'minimized')}
-                            className="w-2.5 h-2.5 rounded-full bg-[#ffbd2e] border border-[#dea123] hover:bg-[#ffbd2e]/80 transition-all flex items-center justify-center group/btn"
+                            className="w-2.5 h-2.5 rounded-full bg-[#ffbd2e] border border-[#dea123] hover:bg-[#ffbd2e]/80 transition-all flex items-center justify-center group/btn cursor-pointer"
                         >
                             <ChevronDown className="w-1.5 h-1.5 text-black opacity-0 group-hover/btn:opacity-100" />
                         </button>
                         <button
                             onClick={() => setWidgetState(widgetState === 'maximized' ? 'normal' : 'maximized')}
-                            className="w-2.5 h-2.5 rounded-full bg-[#27c93f] border border-[#1aab29] hover:bg-[#27c93f]/80 transition-all flex items-center justify-center group/btn"
+                            className="w-2.5 h-2.5 rounded-full bg-[#27c93f] border border-[#1aab29] hover:bg-[#27c93f]/80 transition-all flex items-center justify-center group/btn cursor-pointer"
                         >
                             <Maximize2 className="w-1.5 h-1.5 text-black opacity-0 group-hover/btn:opacity-100" />
                         </button>

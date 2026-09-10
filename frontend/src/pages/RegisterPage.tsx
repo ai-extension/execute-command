@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Zap, Shield, Lock, User as UserIcon, ArrowRight, Loader2, Mail, CheckCircle2 } from 'lucide-react';
+import { Shield, Lock, User as UserIcon, ArrowRight, Loader2, Mail, CheckCircle2 } from 'lucide-react';
 import { API_BASE_URL } from '../lib/api';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
+import AppLogo from '../components/AppLogo';
 
 const RegisterPage = () => {
     const [username, setUsername] = useState('');
@@ -113,12 +114,7 @@ const RegisterPage = () => {
             <div className="w-full max-w-md px-6 relative z-10 animate-in fade-in slide-in-from-bottom-12 duration-1000">
                 {/* Branding Section */}
                 <div className="flex flex-col items-center mb-10 gap-4">
-                    <div className="relative">
-                        <div className="absolute inset-0 bg-primary/40 blur-2xl rounded-full scale-110 animate-pulse" />
-                        <div className="relative premium-gradient p-4 rounded-md shadow-[0_0_40px_rgba(99,102,241,0.4)] rotate-6 hover:rotate-0 transition-all duration-700 cursor-default group">
-                            <Zap className="w-10 h-10 text-white group-hover:scale-110 transition-transform" />
-                        </div>
-                    </div>
+                    <AppLogo size="lg" className="transition-transform duration-500 hover:scale-105" />
                     <div className="text-center space-y-1">
                         <h1 className="text-4xl font-black tracking-tighter text-white drop-shadow-2xl">
                             CSM APP

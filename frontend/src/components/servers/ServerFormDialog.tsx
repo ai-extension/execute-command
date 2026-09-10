@@ -124,14 +124,14 @@ export const ServerFormDialog: React.FC<ServerFormDialogProps> = ({
                                 value={formData.password || ''}
                                 onChange={e => setFormData({ ...formData, password: e.target.value })}
                                 className="col-span-3 text-xs font-bold bg-background border-border"
-                                placeholder="••••••••"
+                                placeholder={editingServer?.has_password ? '•••••••• (unchanged)' : '••••••••'}
                             />
                         ) : (
                             <Textarea
                                 value={formData.private_key || ''}
                                 onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, private_key: e.target.value })}
                                 className="col-span-3 text-xs font-mono bg-background border-border resize-none h-24"
-                                placeholder="-----BEGIN RSA PRIVATE KEY-----"
+                                placeholder={editingServer?.has_private_key ? 'Stored — leave blank to keep it' : '-----BEGIN RSA PRIVATE KEY-----'}
                             />
                         )}
                     </div>

@@ -125,7 +125,7 @@ export const SearchableSelect = ({
             <DropdownMenuPortal>
                 <DropdownMenuContent
                     className={cn(
-                        "z-[200] bg-popover text-popover-foreground backdrop-blur-md border-border/60 shadow-xl rounded-md p-1.5",
+                        "z-[400] bg-popover text-popover-foreground backdrop-blur-md border-border/60 shadow-xl rounded-md p-1.5",
                         "min-w-[var(--radix-dropdown-menu-trigger-width)] max-w-[400px] w-auto",
                         className
                     )}

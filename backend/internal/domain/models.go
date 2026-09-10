@@ -2,6 +2,7 @@ package domain
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"strings"
 	"time"
@@ -241,6 +242,25 @@ type Server struct {
 	DeletedAt          gorm.DeletedAt `json:"-" gorm:"index"`
 }
 
+// MarshalJSON keeps credentials out of every API response. They are decrypted only for
+// the connection layer, so exposing them over HTTP would hand a read-only caller the SSH
+// password and private key. Callers get has_* flags instead, and unmarshalling is
+// untouched, so create/update still accept the real values.
+func (s Server) MarshalJSON() ([]byte, error) {
+	type serverAlias Server
+	return json.Marshal(struct {
+		serverAlias
+		Password      string `json:"password,omitempty"`
+		PrivateKey    string `json:"private_key,omitempty"`
+		HasPassword   bool   `json:"has_password"`
+		HasPrivateKey bool   `json:"has_private_key"`
+	}{
+		serverAlias:   serverAlias(s),
+		HasPassword:   s.Password != "",
+		HasPrivateKey: s.PrivateKey != "",
+	})
+}
+
 type ServerMetrics struct {
 	CPUUsage  float64 `json:"cpu_usage"`
 	RAMUsage  float64 `json:"ram_usage"`
@@ -278,6 +298,29 @@ type VpnConfig struct {
 	CreatedAt          time.Time      `json:"created_at" gorm:"<-:create"`
 	UpdatedAt          time.Time      `json:"updated_at"`
 	DeletedAt          gorm.DeletedAt `json:"-" gorm:"index"`
+}
+
+// MarshalJSON keeps VPN credentials out of every API response, mirroring Server. The
+// WireGuard public key stays visible: it is public by definition.
+func (v VpnConfig) MarshalJSON() ([]byte, error) {
+	type vpnAlias VpnConfig
+	return json.Marshal(struct {
+		vpnAlias
+		Password      string `json:"password,omitempty"`
+		PrivateKey    string `json:"private_key,omitempty"`
+		ConfigFile    string `json:"config_file,omitempty"`
+		SharedKey     string `json:"shared_key,omitempty"`
+		HasPassword   bool   `json:"has_password"`
+		HasPrivateKey bool   `json:"has_private_key"`
+		HasConfigFile bool   `json:"has_config_file"`
+		HasSharedKey  bool   `json:"has_shared_key"`
+	}{
+		vpnAlias:      vpnAlias(v),
+		HasPassword:   v.Password != "",
+		HasPrivateKey: v.PrivateKey != "",
+		HasConfigFile: v.ConfigFile != "",
+		HasSharedKey:  v.SharedKey != "",
+	})
 }
 
 type VpnConfigRepository interface {
@@ -462,15 +505,37 @@ type WorkflowVariable struct {
 }
 
 type GlobalVariable struct {
-	ID                uuid.UUID  `json:"id" gorm:"type:uuid;primaryKey"`
-	NamespaceID       uuid.UUID  `json:"namespace_id" gorm:"type:uuid;index;constraint:OnDelete:CASCADE;"`
-	Key               string     `json:"key" gorm:"not null"`
-	Value             string     `json:"value"`
+	ID          uuid.UUID `json:"id" gorm:"type:uuid;primaryKey"`
+	NamespaceID uuid.UUID `json:"namespace_id" gorm:"type:uuid;index;constraint:OnDelete:CASCADE;"`
+	Key         string    `json:"key" gorm:"not null"`
+	Value       string    `json:"value"`
+	// IsSecret stores the value encrypted and keeps it out of API responses. Ordinary
+	// variables stay readable — seeing their value is the point of the variables screen.
+	IsSecret          bool       `json:"is_secret"`
 	Description       string     `json:"description"`
 	CreatedBy         *uuid.UUID `json:"created_by,omitempty" gorm:"type:uuid;index;<-:create"`
 	CreatedByUsername string     `json:"created_by_username,omitempty" gorm:"<-:create"`
 	CreatedAt         time.Time  `json:"created_at" gorm:"<-:create"`
 	UpdatedAt         time.Time  `json:"updated_at"`
+}
+
+// MarshalJSON withholds the value of a secret variable. Callers still learn that a
+// value is stored, which is all the UI needs to render "unchanged".
+func (g GlobalVariable) MarshalJSON() ([]byte, error) {
+	type globalVariableAlias GlobalVariable
+	value := g.Value
+	if g.IsSecret {
+		value = ""
+	}
+	return json.Marshal(struct {
+		globalVariableAlias
+		Value    string `json:"value"`
+		HasValue bool   `json:"has_value"`
+	}{
+		globalVariableAlias: globalVariableAlias(g),
+		Value:               value,
+		HasValue:            g.Value != "",
+	})
 }
 
 // Dataset is a user-defined collection of records. The schema (Columns) is a loose
@@ -743,6 +808,21 @@ type Page struct {
 	// whether a widget's "updated" badge is still within its window using the server
 	// clock instead of the visitor's (possibly wrong) local clock.
 	ServerTime *time.Time `json:"server_time,omitempty" gorm:"-"`
+}
+
+// MarshalJSON keeps the page password out of API responses. It is a bcrypt hash, and
+// pageTokenSecret falls back to that hash as the HMAC key when PAGE_TOKEN_SECRET is
+// unset, so anyone who could read it could mint page access tokens.
+func (p Page) MarshalJSON() ([]byte, error) {
+	type pageAlias Page
+	return json.Marshal(struct {
+		pageAlias
+		Password    string `json:"password,omitempty"`
+		HasPassword bool   `json:"has_password"`
+	}{
+		pageAlias:   pageAlias(p),
+		HasPassword: p.Password != "",
+	})
 }
 
 type PageWorkflow struct {
