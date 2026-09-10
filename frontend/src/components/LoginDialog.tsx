@@ -133,10 +133,7 @@ const LoginDialog: React.FC<LoginDialogProps> = ({ isOpen, onOpenChange, onSucce
             <DialogContent className="sm:max-w-md bg-[#0f0f0f]/95 border-white/10 backdrop-blur-3xl rounded-md p-0 overflow-hidden shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)]">
                 <div className="p-10">
                     <DialogHeader className="flex flex-col items-center mb-8 gap-4">
-                        <div className="relative">
-                            <div className="absolute inset-0 bg-primary/40 blur-2xl rounded-full scale-110 animate-pulse" />
-                            <AppLogo size="md" />
-                        </div>
+                        <AppLogo size="md" />
                         <div className="text-center space-y-1">
                             <DialogTitle className="text-2xl font-black tracking-tighter text-white uppercase">
                                 System Access

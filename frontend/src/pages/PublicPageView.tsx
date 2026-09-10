@@ -116,11 +116,13 @@ const PublicPageView = () => {
             if (!res.ok) return;
             const data = await res.json();
             const statuses: { id: string; status: string; executed_by?: string }[] = data.statuses || [];
-            const resolved = statuses.filter(s => s.status && s.status !== 'RUNNING');
-            if (resolved.length === 0) return;
+            // Apply every reported status, not just finished ones: a run started in
+            // another browser is still RUNNING here and only this reply carries its runner.
+            const reported = statuses.filter(s => s.status);
+            if (reported.length === 0) return;
             setHistoryMap(prev => {
                 let next = prev;
-                resolved.forEach(s => {
+                reported.forEach(s => {
                     Object.keys(next).forEach(widgetId => {
                         if (next[widgetId].some(e => e.executionId === s.id)) {
                             next = updateEntryStatus(next, widgetId, s.id, s.status, s.executed_by);

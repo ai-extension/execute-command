@@ -256,6 +256,7 @@ const EndpointWidget: React.FC<EndpointWidgetProps> = ({
                         </Button>
                         <Button
                             onClick={() => onStop && onStop(widget)}
+                            variant="plain"
                             className={cn(WIDGET_SQUARE_ACTION, "bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/50 shadow-premium group/stop")}
                         >
                             <Square className="w-5 h-5 fill-current opacity-70 group-hover/stop:opacity-100 transition-opacity" />
