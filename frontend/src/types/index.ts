@@ -212,7 +212,7 @@ export interface WorkflowExecution {
     status: Status;
     inputs: string;
     executed_by?: string;
-    user?: { id: string; username: string };
+    user?: { id: string; username: string; full_name?: string; email?: string };
     log_path: string;
     started_at: string;
     finished_at?: string;

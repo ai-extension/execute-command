@@ -419,7 +419,9 @@ func publicRequestUser(c *gin.Context) *domain.User {
 	return user
 }
 
-// displayName is what a visitor sees as the runner of an execution.
+// displayName is what a visitor sees as the runner of an execution: a real name when
+// the account has one, otherwise whatever identifies it — a Google account may carry
+// only an address.
 func displayName(user *domain.User) string {
 	if user == nil {
 		return ""
@@ -427,7 +429,10 @@ func displayName(user *domain.User) string {
 	if user.FullName != "" {
 		return user.FullName
 	}
-	return user.Username
+	if user.Username != "" {
+		return user.Username
+	}
+	return user.Email
 }
 
 func (h *PageHandler) StopPublicExecution(c *gin.Context) {

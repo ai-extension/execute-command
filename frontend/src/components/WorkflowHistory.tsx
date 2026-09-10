@@ -13,8 +13,7 @@ import {
     FileText,
     Plus,
     XCircle,
-    Layers
-} from 'lucide-react';
+    Layers, UserRound } from 'lucide-react';
 import { Card, CardContent } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -238,6 +237,18 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({
         }
     };
 
+    // Run id, start, duration and runner used to read as one grey string. No frames — the
+    // coloured icon plus breathing room is what separates them.
+    const META_CHIP = "flex items-center gap-1 shrink-0";
+
+    // Who launched the run. A schedule or a hook has no account behind it, and a Google
+    // account may carry only an address.
+    const runnerLabel = (exec: WorkflowExecution): string => {
+        const user = exec.user;
+        if (!user) return 'System';
+        return user.full_name || user.username || user.email || 'System';
+    };
+
     const getTriggerBadge = (exec: WorkflowExecution) => {
         switch (exec.trigger_source) {
             case 'SCHEDULE':
@@ -363,15 +374,19 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({
                                         </span>
                                         <span className="shrink-0">{getTriggerBadge(exec)}</span>
                                     </div>
-                                    <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground font-medium">
-                                        <span className="font-mono shrink-0">#{exec.id.slice(0, 8)}</span>
-                                        <span className="flex items-center gap-1 shrink-0">
-                                            <Calendar className="w-3 h-3" />
+                                    <div className="flex items-center gap-x-4 gap-y-1 flex-wrap text-xs text-muted-foreground font-medium">
+                                        <span className={cn(META_CHIP, "font-mono")}>#{exec.id.slice(0, 8)}</span>
+                                        <span className={META_CHIP}>
+                                            <Calendar className="w-3 h-3 text-sky-500" />
                                             {format(new Date(exec.started_at), 'MMM d, HH:mm:ss')}
                                         </span>
-                                        <span className="flex items-center gap-1 shrink-0">
-                                            <Clock className="w-3 h-3" />
+                                        <span className={META_CHIP}>
+                                            <Clock className="w-3 h-3 text-amber-500" />
                                             {getDuration(exec.started_at, exec.finished_at)}
+                                        </span>
+                                        <span className={META_CHIP} title={exec.user?.email || undefined}>
+                                            <UserRound className="w-3 h-3 text-emerald-500" />
+                                            {runnerLabel(exec)}
                                         </span>
                                         {exec.workflow?.tags && exec.workflow.tags.length > 0 && (
                                             <div className="flex flex-wrap gap-1">

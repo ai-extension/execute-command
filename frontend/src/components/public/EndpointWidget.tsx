@@ -350,12 +350,12 @@ const EndpointWidget: React.FC<EndpointWidgetProps> = ({
                                         <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
                                             {entry.executedBy && (
                                                 <span className="flex items-center gap-1">
-                                                    <UserRound className="w-3 h-3" />
+                                                    <UserRound className="w-3 h-3 text-emerald-500" />
                                                     <span className="font-bold">{entry.executedBy}</span>
                                                 </span>
                                             )}
                                             <span className="flex items-center gap-1">
-                                                <Clock className="w-3 h-3" />
+                                                <Clock className="w-3 h-3 text-amber-500" />
                                                 <span>{formatTime(entry.timestamp)}</span>
                                             </span>
                                         </div>
