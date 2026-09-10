@@ -38,21 +38,24 @@ type SystemSetting struct {
 }
 
 type User struct {
-	ID             uuid.UUID      `json:"id" gorm:"type:uuid;primaryKey"`
-	Username       string         `json:"username" gorm:"uniqueIndex;not null"`
-	FullName       string         `json:"full_name"`
-	Nickname       string         `json:"nickname"`
-	ChatAccountID  string         `json:"chat_account_id"`
-	PasswordHash   string         `json:"-" gorm:"default:null"`
-	Email          string         `json:"email"`
-	SocialProvider string         `json:"social_provider"` // google, facebook, etc.
-	SocialID       string         `json:"social_id"`
-	AvatarURL      string         `json:"avatar_url"`
-	Roles          []Role         `json:"roles" gorm:"many2many:user_roles"`
-	Permissions    []Permission   `json:"permissions" gorm:"many2many:user_permissions"`
-	CreatedAt      time.Time      `json:"created_at" gorm:"<-:create"`
-	UpdatedAt      time.Time      `json:"updated_at"`
-	DeletedAt      gorm.DeletedAt `json:"-" gorm:"index"`
+	ID             uuid.UUID `json:"id" gorm:"type:uuid;primaryKey"`
+	Username       string    `json:"username" gorm:"uniqueIndex;not null"`
+	FullName       string    `json:"full_name"`
+	Nickname       string    `json:"nickname"`
+	ChatAccountID  string    `json:"chat_account_id"`
+	PasswordHash   string    `json:"-" gorm:"default:null"`
+	Email          string    `json:"email"`
+	SocialProvider string    `json:"social_provider"` // google, facebook, etc.
+	SocialID       string    `json:"social_id"`
+	AvatarURL      string    `json:"avatar_url"`
+	// IsSuperAdmin marks the bootstrap administrator. It is set by the seeder, never by a
+	// request payload, so unrestricted access survives any change to roles or username.
+	IsSuperAdmin bool           `json:"is_super_admin" gorm:"not null;default:false"`
+	Roles        []Role         `json:"roles" gorm:"many2many:user_roles"`
+	Permissions  []Permission   `json:"permissions" gorm:"many2many:user_permissions"`
+	CreatedAt    time.Time      `json:"created_at" gorm:"<-:create"`
+	UpdatedAt    time.Time      `json:"updated_at"`
+	DeletedAt    gorm.DeletedAt `json:"-" gorm:"index"`
 }
 
 type Role struct {

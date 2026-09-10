@@ -354,6 +354,14 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 		return
 	}
 
+	// Operators and runbooks identify the bootstrap administrator by this username, and it is
+	// what the seeder looks up on every start — renaming it would strand both.
+	if user.IsSuperAdmin && input.Username != user.Username {
+		h.auditLog.LogAction(c, "UPDATE_USER", "USER", userID.String(), map[string]string{"username": input.Username, "error": "bootstrap superadmin account"}, "FAILED")
+		c.JSON(http.StatusConflict, gin.H{"error": "the default admin account cannot be renamed"})
+		return
+	}
+
 	user.Username = input.Username
 	user.FullName = input.FullName
 	user.Nickname = nickname
@@ -379,6 +387,19 @@ func (h *UserHandler) DeleteUser(c *gin.Context) {
 	}
 
 	resID := userID.String()
+
+	user, err := h.userRepo.GetByID(userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+		return
+	}
+
+	// Deleting this account would leave the installation with no guaranteed way back in.
+	if user.IsSuperAdmin {
+		h.auditLog.LogAction(c, "DELETE", "USER", resID, map[string]string{"username": user.Username, "error": "bootstrap superadmin account"}, "FAILED")
+		c.JSON(http.StatusConflict, gin.H{"error": "the default admin account cannot be deleted"})
+		return
+	}
 
 	if err := h.userRepo.Delete(userID); err != nil {
 		h.auditLog.LogAction(c, "DELETE", "USER", resID, map[string]string{"error": err.Error()}, "FAILED")

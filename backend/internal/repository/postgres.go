@@ -375,6 +375,15 @@ func (r *PostgresRoleRepo) Delete(id uuid.UUID) error {
 			return err
 		}
 
+		// The role is only soft-deleted, so its join rows survive the delete and pile up
+		// unreachable — reads filter them out through the role, never by their own id.
+		if err := tx.Exec("DELETE FROM user_roles WHERE role_id = ?", id).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("role_id = ?", id).Delete(&domain.RolePermission{}).Error; err != nil {
+			return err
+		}
+
 		return tx.Delete(&role).Error
 	})
 }

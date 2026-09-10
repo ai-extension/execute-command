@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import { Badge } from '../components/ui/badge';
 import { useAuth } from '../context/AuthContext';
 import { ResourceFilters } from '../components/ResourceFilters';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import { cn } from '../lib/utils';
 import { useNavigate } from 'react-router-dom';
 
@@ -25,13 +26,14 @@ import { Label } from "../components/ui/label";
 import { Input } from "../components/ui/input";
 
 const RolesPage = () => {
-    const { apiFetch } = useAuth();
+    const { apiFetch, showToast } = useAuth();
     const navigate = useNavigate();
     const [roles, setRoles] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [newRoleData, setNewRoleData] = useState({ name: '', description: '' });
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [deleteTarget, setDeleteTarget] = useState<any>(null);
     const [searchTerm, setSearchTerm] = usePersistentState('roles_search', '');
 
     const [total, setTotal] = useState(0);
@@ -83,6 +85,27 @@ const RolesPage = () => {
             }
         } catch (error) {
             console.error('Failed to create role:', error);
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const confirmDelete = async () => {
+        if (!deleteTarget) return;
+        setIsSubmitting(true);
+        try {
+            const response = await apiFetch(`${API_BASE_URL}/roles/${deleteTarget.id}`, {
+                method: 'DELETE'
+            });
+            if (response.ok) {
+                await fetchRoles();
+                setDeleteTarget(null);
+            } else {
+                const error = await response.json();
+                showToast(error.error || 'Failed to delete role', 'error');
+            }
+        } catch (error) {
+            console.error('Failed to delete role:', error);
         } finally {
             setIsSubmitting(false);
         }
@@ -211,7 +234,13 @@ const RolesPage = () => {
                                     >
                                         <Settings className="w-3 h-3 mr-2" /> Permissions
                                     </Button>
-                                    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all">
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-9 w-9 rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all"
+                                        onClick={() => setDeleteTarget(role)}
+                                        title="Delete Role"
+                                    >
                                         <Trash2 className="w-4 h-4" />
                                     </Button>
                                 </div>
@@ -242,6 +271,17 @@ const RolesPage = () => {
                     </div>
                 )}
             </div>
+
+            <ConfirmDialog
+                isOpen={!!deleteTarget}
+                onClose={() => setDeleteTarget(null)}
+                onConfirm={confirmDelete}
+                title="Delete Role"
+                description={`Are you sure you want to delete the role "${deleteTarget?.name}"? Users holding this role will lose the permissions it grants.`}
+                confirmText="Delete Role"
+                variant="danger"
+                isLoading={isSubmitting}
+            />
         </div>
     );
 };

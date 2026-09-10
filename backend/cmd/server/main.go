@@ -117,6 +117,7 @@ func main() {
 	seedLocalServer(db)
 	seedSystemSettings(db)
 	migrateAssignDefaultNamespace(db)
+	migrateFlagBootstrapSuperadmin(db)
 
 	// Initialize Hub
 	hub := service.NewHub()
@@ -556,6 +557,7 @@ func seedAdmin(db *gorm.DB) {
 			Username:     "admin",
 			PasswordHash: string(hashedPassword),
 			Email:        "admin@example.com",
+			IsSuperAdmin: true,
 			Roles:        []domain.Role{adminRole},
 		}
 		if err := db.Create(&adminUser).Error; err != nil {
@@ -594,6 +596,21 @@ func getDefaultNamespaceID(db *gorm.DB) uuid.UUID {
 		return uuid.Nil
 	}
 	return ns.ID
+}
+
+// migrateFlagBootstrapSuperadmin backfills is_super_admin onto the bootstrap administrator of
+// installations created before the flag existed, where full access came from the "admin" role
+// alone. Idempotent, and it only ever grants the account the seeder itself owns.
+func migrateFlagBootstrapSuperadmin(db *gorm.DB) {
+	res := db.Exec(
+		"UPDATE users SET is_super_admin = true WHERE username = ? AND is_super_admin = false AND deleted_at IS NULL",
+		"admin",
+	)
+	if res.Error != nil {
+		log.Printf("[Migrate] flag bootstrap superadmin failed: %v", res.Error)
+	} else if res.RowsAffected > 0 {
+		log.Printf("[Migrate] flagged %d bootstrap superadmin account(s)", res.RowsAffected)
+	}
 }
 
 // migrateAssignDefaultNamespace backfills the Default namespace onto pre-existing servers and

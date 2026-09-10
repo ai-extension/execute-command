@@ -1,23 +1,15 @@
 package domain
 
-import (
-	"strings"
-)
-
-// IsSuperAdmin reports whether the user has unrestricted access. Superadmin status is
-// granted by holding the built-in "admin" role — NOT by username. Tying it to a username
-// is fragile: if the admin account were deleted, a non-admin could re-register "admin" and
-// inherit full access. Roles can only be assigned by an existing admin, so they are safe.
+// IsSuperAdmin reports whether the user has unrestricted access. It is carried by the
+// is_super_admin column, set by the seeder and never by a request payload — NOT by username
+// and NOT by role name. Keying it off a name would be fragile: whoever could create or
+// rename a role, or re-register a deleted account, would inherit full access. Every other
+// account earns its access through roles and permissions.
 func IsSuperAdmin(user *User) bool {
 	if user == nil {
 		return false
 	}
-	for _, role := range user.Roles {
-		if strings.EqualFold(role.Name, "admin") {
-			return true
-		}
-	}
-	return false
+	return user.IsSuperAdmin
 }
 
 // HasPermission checks if a user has a specific permission, considering hierarchy.
