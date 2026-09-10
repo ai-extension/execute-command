@@ -16,6 +16,8 @@ const RegisterPage = () => {
     const [error, setError] = useState('');
     const [success, setSuccess] = useState(false);
     const [allowRegistration, setAllowRegistration] = useState(true);
+    const [siteTitle, setSiteTitle] = useState('');
+    const [siteLogo, setSiteLogo] = useState('');
 
     const navigate = useNavigate();
 
@@ -29,6 +31,8 @@ const RegisterPage = () => {
                         setAllowRegistration(false);
                         setError("Registration is currently disabled by the administrator.");
                     }
+                    setSiteTitle(data.site_title || '');
+                    setSiteLogo(data.site_logo || '');
                 }
             } catch (err) {
                 console.error("Failed to fetch public settings", err);
@@ -114,10 +118,10 @@ const RegisterPage = () => {
             <div className="w-full max-w-md px-6 relative z-10 animate-in fade-in slide-in-from-bottom-12 duration-1000">
                 {/* Branding Section */}
                 <div className="flex flex-col items-center mb-10 gap-4">
-                    <AppLogo size="lg" className="transition-transform duration-500 hover:scale-105" />
+                    <AppLogo src={siteLogo} size="lg" className="transition-transform duration-500 hover:scale-105" />
                     <div className="text-center space-y-1">
                         <h1 className="text-4xl font-black tracking-tighter text-white drop-shadow-2xl">
-                            CSM APP
+                            {siteTitle || 'CSM APP'}
                         </h1>
                         <div className="flex items-center justify-center gap-2">
                             <div className="h-[1px] w-8 bg-gradient-to-r from-transparent to-primary/50" />

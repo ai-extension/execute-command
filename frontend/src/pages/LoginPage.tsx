@@ -18,6 +18,8 @@ const LoginPage = () => {
     const [allowRegistration, setAllowRegistration] = useState(false);
     const [googleEnabled, setGoogleEnabled] = useState(false);
     const [googleClientId, setGoogleClientId] = useState('');
+    const [siteTitle, setSiteTitle] = useState('');
+    const [siteLogo, setSiteLogo] = useState('');
     const [settingsLoaded, setSettingsLoaded] = useState(false);
     // 'choose' lists the sign-in methods; 'credentials' reveals the username form.
     const [mode, setMode] = useState<'choose' | 'credentials'>('choose');
@@ -34,6 +36,8 @@ const LoginPage = () => {
                     setAllowRegistration(data.allow_registration);
                     setGoogleEnabled(data.google_auth_enabled);
                     setGoogleClientId(data.google_client_id || '');
+                    setSiteTitle(data.site_title || '');
+                    setSiteLogo(data.site_logo || '');
                     setFacebookEnabled(data.facebook_auth_enabled);
                 }
             } catch (err) {
@@ -135,10 +139,10 @@ const LoginPage = () => {
             <div className="w-full max-w-md px-6 relative z-10 animate-in fade-in slide-in-from-bottom-12 duration-1000">
                 {/* Branding Section */}
                 <div className="flex flex-col items-center mb-10 gap-4">
-                    <AppLogo size="lg" className="transition-transform duration-500 hover:scale-105" />
+                    <AppLogo src={siteLogo} size="lg" className="transition-transform duration-500 hover:scale-105" />
                     <div className="text-center space-y-1">
                         <h1 className="text-4xl font-black tracking-tighter text-white drop-shadow-2xl">
-                            CSM APP
+                            {siteTitle || 'CSM APP'}
                         </h1>
                         <div className="flex items-center justify-center gap-2">
                             <div className="h-[1px] w-8 bg-gradient-to-r from-transparent to-primary/50" />

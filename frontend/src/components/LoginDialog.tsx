@@ -29,6 +29,8 @@ const LoginDialog: React.FC<LoginDialogProps> = ({ isOpen, onOpenChange, onSucce
     const [googleClientId, setGoogleClientId] = useState('');
     const [facebookEnabled, setFacebookEnabled] = useState(false);
     const [settingsLoaded, setSettingsLoaded] = useState(false);
+    const [siteTitle, setSiteTitle] = useState('');
+    const [siteLogo, setSiteLogo] = useState('');
     // 'choose' lists the sign-in methods; 'credentials' reveals the username form.
     const [mode, setMode] = useState<'choose' | 'credentials'>('choose');
     const { login, showToast } = useAuth();
@@ -46,6 +48,8 @@ const LoginDialog: React.FC<LoginDialogProps> = ({ isOpen, onOpenChange, onSucce
                 setGoogleEnabled(!!data.google_auth_enabled);
                 setGoogleClientId(data.google_client_id || '');
                 setFacebookEnabled(!!data.facebook_auth_enabled);
+                setSiteTitle(data.site_title || '');
+                setSiteLogo(data.site_logo || '');
             } catch (err) {
                 console.error('Failed to fetch public settings', err);
             } finally {
@@ -133,10 +137,10 @@ const LoginDialog: React.FC<LoginDialogProps> = ({ isOpen, onOpenChange, onSucce
             <DialogContent className="sm:max-w-md bg-[#0f0f0f]/95 border-white/10 backdrop-blur-3xl rounded-md p-0 overflow-hidden shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)]">
                 <div className="p-10">
                     <DialogHeader className="flex flex-col items-center mb-8 gap-4">
-                        <AppLogo size="md" />
+                        <AppLogo src={siteLogo} size="md" />
                         <div className="text-center space-y-1">
                             <DialogTitle className="text-2xl font-black tracking-tighter text-white uppercase">
-                                System Access
+                                {siteTitle || 'System Access'}
                             </DialogTitle>
                             <DialogDescription className="text-[10px] font-black text-primary tracking-[0.4em] uppercase opacity-70">
                                 Administrative Login

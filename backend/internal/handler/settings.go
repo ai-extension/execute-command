@@ -87,10 +87,17 @@ func (h *SettingsHandler) GetPublicSettings(c *gin.Context) {
 		googleClientID, _ = h.settingsService.GetSetting("google_client_id")
 	}
 
+	// Branding is what every screen shows before anyone signs in — the login page, the
+	// register page and the public pages all need it.
+	siteTitle, _ := h.settingsService.GetSetting("site_title")
+	siteLogo, _ := h.settingsService.GetSetting("site_logo")
+
 	c.JSON(http.StatusOK, gin.H{
 		"allow_registration":    allowReg == "true",
 		"google_auth_enabled":   googleEnabled == "true",
 		"google_client_id":      googleClientID,
 		"facebook_auth_enabled": facebookEnabled == "true",
+		"site_title":            siteTitle,
+		"site_logo":             siteLogo,
 	})
 }
