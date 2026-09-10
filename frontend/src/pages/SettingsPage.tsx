@@ -496,8 +496,8 @@ const SettingsPage = () => {
                                                         type={showSecrets['google'] ? "text" : "password"}
                                                         value={systemSettings.google_client_secret || ''}
                                                         onChange={(e) => setSystemSettings(prev => ({ ...prev, google_client_secret: e.target.value }))}
-                                                        onBlur={(e) => updateSetting('google_client_secret', e.target.value)}
-                                                        placeholder="Enter Google Client Secret"
+                                                        onBlur={(e) => e.target.value && updateSetting('google_client_secret', e.target.value)}
+                                                        placeholder={systemSettings.has_google_client_secret === 'true' ? 'Stored — leave blank to keep it' : 'Enter Google Client Secret'}
                                                         className="h-9 bg-background/50 border-border/50 text-xs font-medium pr-10"
                                                     />
                                                     <button
@@ -548,8 +548,8 @@ const SettingsPage = () => {
                                                         type={showSecrets['facebook'] ? "text" : "password"}
                                                         value={systemSettings.facebook_client_secret || ''}
                                                         onChange={(e) => setSystemSettings(prev => ({ ...prev, facebook_client_secret: e.target.value }))}
-                                                        onBlur={(e) => updateSetting('facebook_client_secret', e.target.value)}
-                                                        placeholder="Enter Facebook App Secret"
+                                                        onBlur={(e) => e.target.value && updateSetting('facebook_client_secret', e.target.value)}
+                                                        placeholder={systemSettings.has_facebook_client_secret === 'true' ? 'Stored — leave blank to keep it' : 'Enter Facebook App Secret'}
                                                         className="h-9 bg-background/50 border-border/50 text-xs font-medium pr-10"
                                                     />
                                                     <button

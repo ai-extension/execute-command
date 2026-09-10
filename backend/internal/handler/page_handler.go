@@ -173,6 +173,7 @@ func (h *PageHandler) UpdatePage(c *gin.Context) {
 	c.Set("namespace_id", existing.NamespaceID)
 
 	diff := utils.CalculateDiff(existing, &page)
+	diff = markCredentialChange(diff, "password", page.Password != "")
 
 	if err := h.service.UpdatePage(&page, user); err != nil {
 		meta := diff

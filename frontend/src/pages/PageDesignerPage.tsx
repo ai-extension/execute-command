@@ -438,7 +438,7 @@ const PageDesignerPage = () => {
                 setParentId(data.parent_id || '');
                 setParentTitle(data.parent?.title || '');
                 setShowParentSidebar(data.show_parent_sidebar ?? false);
-                if (data.password) {
+                if (data.has_password) {
                     setPassword('********');
                 } else {
                     setPassword('');

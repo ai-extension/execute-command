@@ -51,12 +51,15 @@ func (s *GlobalVariableService) Update(gv *domain.GlobalVariable, user *domain.U
 	if gv.Key != "" {
 		existing.Key = gv.Key
 	}
+	// A secret value is never sent back to the client, so an empty value means
+	// "unchanged" rather than "clear it".
 	if gv.Value != "" {
 		existing.Value = gv.Value
 	}
 	if gv.Description != "" {
 		existing.Description = gv.Description
 	}
+	existing.IsSecret = gv.IsSecret
 
 	return s.repo.Update(existing)
 }

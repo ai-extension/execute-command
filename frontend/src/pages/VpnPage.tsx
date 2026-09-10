@@ -119,7 +119,9 @@ const VpnPage = () => {
     const handleOpenForm = (vpn?: VpnConfig) => {
         if (vpn) {
             setEditingVpn(vpn);
-            setFormData(vpn);
+            // The API never returns credentials, and an empty field means "keep the
+            // stored value", so the secret inputs always start blank on edit.
+            setFormData({ ...vpn, password: '', private_key: '', config_file: '', shared_key: '' });
         } else {
             setEditingVpn(null);
             setFormData({
@@ -480,14 +482,14 @@ const VpnPage = () => {
                                             value={formData.password}
                                             onChange={e => setFormData({ ...formData, password: e.target.value })}
                                             className="col-span-3 text-xs font-bold bg-background border-border"
-                                            placeholder="••••••••"
+                                            placeholder={editingVpn?.has_password ? '•••••••• (unchanged)' : '••••••••'}
                                         />
                                     ) : (
                                         <Textarea
                                             value={formData.private_key}
                                             onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, private_key: e.target.value })}
                                             className="col-span-3 text-xs font-mono bg-background border-border resize-none h-24"
-                                            placeholder="-----BEGIN RSA PRIVATE KEY-----"
+                                            placeholder={editingVpn?.has_private_key ? 'Stored — leave blank to keep it' : '-----BEGIN RSA PRIVATE KEY-----'}
                                         />
                                     )}
                                 </div>
@@ -520,7 +522,7 @@ const VpnPage = () => {
                                         value={formData.config_file}
                                         onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, config_file: e.target.value })}
                                         className="col-span-3 text-xs font-mono bg-background border-border resize-none h-32"
-                                        placeholder="client\nremote ovpn.example.com 1194\n..."
+                                        placeholder={editingVpn?.has_config_file ? 'Stored — leave blank to keep it' : 'client\nremote ovpn.example.com 1194\n...'}
                                     />
                                 </div>
                             </>
@@ -562,7 +564,7 @@ const VpnPage = () => {
                                         value={formData.shared_key}
                                         onChange={e => setFormData({ ...formData, shared_key: e.target.value })}
                                         className="col-span-3 text-xs font-bold bg-background border-border"
-                                        placeholder="Preshared Key (Optional)"
+                                        placeholder={editingVpn?.has_shared_key ? 'Stored — leave blank to keep it' : 'Preshared Key (Optional)'}
                                     />
                                 </div>
                                 <div className="grid grid-cols-4 items-center gap-4">
@@ -572,7 +574,7 @@ const VpnPage = () => {
                                         value={formData.config_file}
                                         onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, config_file: e.target.value })}
                                         className="col-span-3 text-xs font-mono bg-background border-border resize-none h-32"
-                                        placeholder="[Interface]\nPrivateKey = ...\nAddress = 10.0.0.1/24"
+                                        placeholder={editingVpn?.has_config_file ? 'Stored — leave blank to keep it' : '[Interface]\nPrivateKey = ...\nAddress = 10.0.0.1/24'}
                                     />
                                 </div>
                             </>

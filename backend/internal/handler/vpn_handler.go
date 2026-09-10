@@ -114,13 +114,20 @@ func (h *VpnConfigHandler) Update(c *gin.Context) {
 	}
 	vpn.ID = id
 
+	meta := map[string]interface{}{"name": vpn.Name}
+	meta = markCredentialChange(meta, "password", vpn.Password != "")
+	meta = markCredentialChange(meta, "private_key", vpn.PrivateKey != "")
+	meta = markCredentialChange(meta, "config_file", vpn.ConfigFile != "")
+	meta = markCredentialChange(meta, "shared_key", vpn.SharedKey != "")
+
 	user, _ := c.Get("user")
 	if err := h.service.Update(&vpn, user.(*domain.User)); err != nil {
-		h.auditLog.LogAction(c, "UPDATE", "VPN", id.String(), map[string]string{"name": vpn.Name, "error": err.Error()}, "FAILED")
+		meta["error"] = err.Error()
+		h.auditLog.LogAction(c, "UPDATE", "VPN", id.String(), meta, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	h.auditLog.LogAction(c, "UPDATE", "VPN", id.String(), map[string]string{"name": vpn.Name}, "SUCCESS")
+	h.auditLog.LogAction(c, "UPDATE", "VPN", id.String(), meta, "SUCCESS")
 	c.JSON(http.StatusOK, vpn)
 }
 

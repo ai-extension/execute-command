@@ -68,6 +68,16 @@ func (r *PostgresServerRepo) decryptServer(server *domain.Server) {
 				server.Vpn.PrivateKey = dec
 			}
 		}
+		if server.Vpn.ConfigFile != "" {
+			if dec, err := crypto.Decrypt(server.Vpn.ConfigFile); err == nil {
+				server.Vpn.ConfigFile = dec
+			}
+		}
+		if server.Vpn.SharedKey != "" {
+			if dec, err := crypto.Decrypt(server.Vpn.SharedKey); err == nil {
+				server.Vpn.SharedKey = dec
+			}
+		}
 	}
 }
 

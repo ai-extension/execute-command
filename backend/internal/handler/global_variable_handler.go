@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 	"github.com/google/uuid"
 	"github.com/user/csm-backend/internal/domain"
 	"github.com/user/csm-backend/internal/lib/utils"
@@ -100,10 +101,17 @@ func (h *GlobalVariableHandler) Create(c *gin.Context) {
 
 func (h *GlobalVariableHandler) Update(c *gin.Context) {
 	var gv domain.GlobalVariable
-	if err := c.ShouldBindJSON(&gv); err != nil {
+	if err := c.ShouldBindBodyWith(&gv, binding.JSON); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	// A plain bool cannot tell "is_secret": false from an omitted field, and treating an
+	// omission as false would un-secret the variable and expose its value.
+	var probe struct {
+		IsSecret *bool `json:"is_secret"`
+	}
+	_ = c.ShouldBindBodyWith(&probe, binding.JSON)
 
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
@@ -123,7 +131,13 @@ func (h *GlobalVariableHandler) Update(c *gin.Context) {
 	}
 	c.Set("namespace_id", existing.NamespaceID)
 
+	if probe.IsSecret == nil {
+		gv.IsSecret = existing.IsSecret
+	}
+
 	diff := utils.CalculateDiff(existing, &gv)
+	// A secret value is redacted on both sides of the diff, so record the rotation itself.
+	diff = markCredentialChange(diff, "value", gv.IsSecret && gv.Value != "")
 
 	if err := h.service.Update(&gv, user); err != nil {
 		meta := diff

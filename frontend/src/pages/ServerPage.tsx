@@ -163,7 +163,9 @@ const ServerPage = () => {
     const handleOpenForm = (server?: Server) => {
         if (server) {
             setEditingServer(server);
-            setFormData({ ...server, vpn_id: server.vpn_id || 'none' });
+            // The API never returns credentials, and an empty field means "keep the
+            // stored value", so the secret inputs always start blank on edit.
+            setFormData({ ...server, vpn_id: server.vpn_id || 'none', password: '', private_key: '' });
         } else {
             setEditingServer(null);
             setFormData({
