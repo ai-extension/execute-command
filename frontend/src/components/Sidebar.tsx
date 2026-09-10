@@ -2,6 +2,7 @@ import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Terminal, Settings, Box, ChevronsLeft, ChevronsRight, Zap, LogOut, Users, Shield, Server, Network, History, Globe, Calendar, Tag, Layout, ShieldCheck, Table2 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import AppLogo from './AppLogo';
 import { Button } from './ui/button';
 import { useAuth } from '../context/AuthContext';
 
@@ -88,13 +89,7 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }: SidebarProps) => {
             )}
         >
             <div className={cn("flex items-center gap-2.5 px-1 relative w-full mb-2", isCollapsed && "justify-center px-0")}>
-                <div className="premium-gradient p-2 rounded-md shadow-premium rotate-2 hover:rotate-0 transition-all duration-300 shrink-0 flex items-center justify-center min-w-[36px] min-h-[36px]">
-                    {siteLogo ? (
-                        <img src={siteLogo} alt="Logo" className="w-5 h-5 object-contain" />
-                    ) : (
-                        <Zap className="w-5 h-5 text-white" />
-                    )}
-                </div>
+                <AppLogo src={siteLogo} size="sm" className="shrink-0 transition-transform duration-300 hover:scale-105" />
                 {!isCollapsed && (
                     <div className="flex flex-col animate-in fade-in slide-in-from-left-2 duration-500">
                         <span className="text-lg font-black tracking-tighter leading-none truncate max-w-[180px]">{siteTitle}</span>

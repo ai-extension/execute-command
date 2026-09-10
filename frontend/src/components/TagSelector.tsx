@@ -104,7 +104,7 @@ export function TagSelector({ selectedTags, onChange, className }: TagSelectorPr
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
-                className="bg-card border-border shadow-xl z-50 p-1.5 min-w-[200px]"
+                className="bg-card border-border shadow-xl z-[400] p-1.5 min-w-[200px]"
                 style={{ width: 'var(--radix-dropdown-menu-trigger-width)' }}
                 align="start"
             >

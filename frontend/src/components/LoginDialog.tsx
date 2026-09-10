@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Zap, Shield, Lock, User as UserIcon, ArrowRight, ArrowLeft, Loader2 } from 'lucide-react';
+import { Shield, Lock, User as UserIcon, ArrowRight, ArrowLeft, Loader2 } from 'lucide-react';
 import { API_BASE_URL } from '../lib/api';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
+import AppLogo from './AppLogo';
 import AuthMethodChooser from './auth/AuthMethodChooser';
 import {
     Dialog,
@@ -134,9 +135,7 @@ const LoginDialog: React.FC<LoginDialogProps> = ({ isOpen, onOpenChange, onSucce
                     <DialogHeader className="flex flex-col items-center mb-8 gap-4">
                         <div className="relative">
                             <div className="absolute inset-0 bg-primary/40 blur-2xl rounded-full scale-110 animate-pulse" />
-                            <div className="relative premium-gradient p-3 rounded-md shadow-[0_0_30px_rgba(99,102,241,0.4)]">
-                                <Zap className="w-6 h-6 text-white" />
-                            </div>
+                            <AppLogo size="md" />
                         </div>
                         <div className="text-center space-y-1">
                             <DialogTitle className="text-2xl font-black tracking-tighter text-white uppercase">

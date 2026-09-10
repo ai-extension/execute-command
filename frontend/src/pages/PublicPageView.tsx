@@ -616,7 +616,7 @@ const PublicPageView = () => {
                                 }
                                 if (widget.type === 'LINK') {
                                     return (
-                                        <div className="group bg-card border border-border rounded-md overflow-hidden hover:border-indigo-500/40 transition-all shadow-sm h-full flex flex-col">
+                                        <div className="group bg-card border border-border rounded-md overflow-hidden hover:border-foreground/20 transition-all shadow-sm h-full flex flex-col">
                                             <div className="flex items-center gap-4 px-8 py-4 border-b border-border bg-card">
                                                 <div className="p-2.5 rounded-md bg-indigo-500/10 text-indigo-500 ring-1 ring-indigo-500/20">
                                                     <WidgetIcon name={widget.icon} fallback={Link2} className="w-4 h-4" />
@@ -634,7 +634,7 @@ const PublicPageView = () => {
                                                     return (
                                                         <a href={widget.url || '#'} target={widget.new_tab ? "_blank" : "_self"} rel="noreferrer"
                                                             style={r.style}
-                                                            className={cn("h-14 w-full rounded-md flex items-center justify-center text-white font-black text-[10px] shadow-sm cursor-pointer transition-all hover:scale-[1.02]", r.className)}>
+                                                            className={cn("h-14 w-full rounded-md flex items-center justify-center text-white font-black text-[10px] shadow-sm cursor-pointer transition-all active:scale-[0.98] hover:brightness-110", r.className)}>
                                                             <Link2 className="w-4 h-4 mr-2" />
                                                             {widget.label || 'OPEN LINK'}
                                                         </a>

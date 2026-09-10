@@ -203,8 +203,8 @@ const PageExecutionTerminal: React.FC<PageExecutionTerminalProps> = ({
     }
 
     // Portal to <body> so the live terminal escapes any ancestor stacking context on the
-    // page and reliably sits above the per-widget history/log dialogs (Radix portals at
-    // z-50). z-[200] keeps it the topmost layer while a run is in progress.
+    // page. It sits above the page at z-[200] but below modal dialogs (z-[300]): a run's
+    // log must never cover the input or history dialog the operator just opened.
     return createPortal(
         <div
             ref={containerRef}
