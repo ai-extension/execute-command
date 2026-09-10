@@ -41,6 +41,8 @@ type User struct {
 	ID             uuid.UUID      `json:"id" gorm:"type:uuid;primaryKey"`
 	Username       string         `json:"username" gorm:"uniqueIndex;not null"`
 	FullName       string         `json:"full_name"`
+	Nickname       string         `json:"nickname"`
+	ChatAccountID  string         `json:"chat_account_id"`
 	PasswordHash   string         `json:"-" gorm:"default:null"`
 	Email          string         `json:"email"`
 	SocialProvider string         `json:"social_provider"` // google, facebook, etc.

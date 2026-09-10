@@ -2657,7 +2657,42 @@ func (e *WorkflowExecutor) getInterpolationContext(inputs map[string]string, var
 	// 4. Step/Group Status: flow.group_key.status and flow.group_key.step.action_key
 	ctx["flow"] = flowData
 
+	// 5. Runner identity: user.username, user.full_name, user.nickname, user.email, user.chat_account_id
+	ctx["user"] = runnerContext(user)
+
 	return ctx
+}
+
+// runnerContext exposes the identity of whoever triggered the run to templates. Keys are
+// always present — a schedule run has no user, and a missing key would break `{{ user.x }}`
+// rendering instead of rendering empty. Values pass the same SecurityRegex screen as global
+// variables because they end up inside shell commands.
+func runnerContext(user *domain.User) map[string]string {
+	runner := map[string]string{
+		"id":              "",
+		"username":        "",
+		"full_name":       "",
+		"nickname":        "",
+		"email":           "",
+		"chat_account_id": "",
+	}
+	if user == nil {
+		return runner
+	}
+
+	runner["id"] = user.ID.String()
+	for key, value := range map[string]string{
+		"username":        user.Username,
+		"full_name":       user.FullName,
+		"nickname":        user.Nickname,
+		"email":           user.Email,
+		"chat_account_id": user.ChatAccountID,
+	} {
+		if SecurityRegex.MatchString(value) {
+			runner[key] = value
+		}
+	}
+	return runner
 }
 
 func (e *WorkflowExecutor) rewriteObjectPaths(obj interface{}, re *regexp.Regexp) interface{} {

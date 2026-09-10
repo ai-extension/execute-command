@@ -6,6 +6,8 @@ import {
     Mail,
     RefreshCw,
     Save,
+    Smile,
+    MessageSquare,
     AlertCircle,
     CheckCircle2,
     Key
@@ -27,6 +29,8 @@ const ProfilePage = () => {
     const [profileData, setProfileData] = useState({
         username: user?.username || '',
         full_name: user?.full_name || '',
+        nickname: user?.nickname || '',
+        chat_account_id: user?.chat_account_id || '',
         email: user?.email || ''
     });
     const [passwordData, setPasswordData] = useState({ old_password: '', new_password: '', confirm_password: '' });
@@ -42,6 +46,8 @@ const ProfilePage = () => {
             setProfileData({
                 username: user.username,
                 full_name: user.full_name || '',
+                nickname: user.nickname || '',
+                chat_account_id: user.chat_account_id || '',
                 email: user.email || ''
             });
         }
@@ -57,6 +63,8 @@ const ProfilePage = () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     full_name: profileData.full_name,
+                    nickname: profileData.nickname,
+                    chat_account_id: profileData.chat_account_id,
                     email: profileData.email
                 })
             });
@@ -169,6 +177,32 @@ const ProfilePage = () => {
                                                 value={profileData.full_name}
                                                 onChange={(e) => setProfileData({ ...profileData, full_name: e.target.value })}
                                                 placeholder="Legal name or alias"
+                                                className="pl-12 h-9 bg-muted/20 border-border focus:bg-muted/40 transition-all rounded-md font-bold text-sm"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60 ml-1">Nickname</label>
+                                        <div className="relative group">
+                                            <Smile className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                                            <Input
+                                                value={profileData.nickname}
+                                                onChange={(e) => setProfileData({ ...profileData, nickname: e.target.value })}
+                                                placeholder="Short name used by workflows"
+                                                className="pl-12 h-9 bg-muted/20 border-border focus:bg-muted/40 transition-all rounded-md font-bold text-sm"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60 ml-1">Chat Account ID</label>
+                                        <div className="relative group">
+                                            <MessageSquare className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                                            <Input
+                                                value={profileData.chat_account_id}
+                                                onChange={(e) => setProfileData({ ...profileData, chat_account_id: e.target.value })}
+                                                placeholder="Slack / chat member ID"
                                                 className="pl-12 h-9 bg-muted/20 border-border focus:bg-muted/40 transition-all rounded-md font-bold text-sm"
                                             />
                                         </div>

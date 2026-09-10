@@ -4,16 +4,39 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/user/csm-backend/internal/domain"
 	"golang.org/x/crypto/bcrypt"
 )
+
+// identityFieldRegex bounds the self-service identity fields. They surface in workflow
+// commands as `{{ user.nickname }}` / `{{ user.chat_account_id }}`, and the executor's
+// SecurityRegex still admits `;`, `&&`, `|` and `$(...)`, so anything beyond a name or a
+// chat handle is rejected here — at the only place a non-admin can write these values.
+var identityFieldRegex = regexp.MustCompile(`^[\pL0-9 ._@+-]*$`)
+
+const identityFieldMaxLen = 100
+
+// sanitizeIdentityField trims a nickname / chat account id and rejects unsafe content.
+func sanitizeIdentityField(label, value string) (string, error) {
+	value = strings.TrimSpace(value)
+	if utf8.RuneCountInString(value) > identityFieldMaxLen {
+		return "", fmt.Errorf("%s must be at most %d characters", label, identityFieldMaxLen)
+	}
+	if !identityFieldRegex.MatchString(value) {
+		return "", fmt.Errorf("%s may only contain letters, digits, spaces and . _ @ + -", label)
+	}
+	return value, nil
+}
 
 type UserHandler struct {
 	userRepo    domain.UserRepository
@@ -79,8 +102,10 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 	}
 
 	var input struct {
-		FullName string `json:"full_name"`
-		Email    string `json:"email" binding:"required,email"`
+		FullName      string `json:"full_name"`
+		Nickname      string `json:"nickname"`
+		ChatAccountID string `json:"chat_account_id"`
+		Email         string `json:"email" binding:"required,email"`
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -105,7 +130,20 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 		}
 	}
 
+	nickname, err := sanitizeIdentityField("nickname", input.Nickname)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	chatAccountID, err := sanitizeIdentityField("chat account id", input.ChatAccountID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
 	user.FullName = input.FullName
+	user.Nickname = nickname
+	user.ChatAccountID = chatAccountID
 	user.Email = input.Email
 
 	if err := h.userRepo.Update(user); err != nil {
@@ -287,9 +325,11 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 	}
 
 	var input struct {
-		Username string `json:"username" binding:"required"`
-		FullName string `json:"full_name"`
-		Email    string `json:"email"`
+		Username      string `json:"username" binding:"required"`
+		FullName      string `json:"full_name"`
+		Nickname      string `json:"nickname"`
+		ChatAccountID string `json:"chat_account_id"`
+		Email         string `json:"email"`
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -303,8 +343,21 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 		return
 	}
 
+	nickname, err := sanitizeIdentityField("nickname", input.Nickname)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	chatAccountID, err := sanitizeIdentityField("chat account id", input.ChatAccountID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
 	user.Username = input.Username
 	user.FullName = input.FullName
+	user.Nickname = nickname
+	user.ChatAccountID = chatAccountID
 	user.Email = input.Email
 
 	if err := h.userRepo.Update(user); err != nil {

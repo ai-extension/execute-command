@@ -47,7 +47,7 @@ const UsersPage = () => {
     const [selectedUser, setSelectedUser] = useState<any>(null);
     const [selectedRoleIDs, setSelectedRoleIDs] = useState<string[]>([]);
     const [newUserData, setNewUserData] = useState({ username: '', password: '', email: '' });
-    const [editUserData, setEditUserData] = useState({ username: '', full_name: '', email: '' });
+    const [editUserData, setEditUserData] = useState({ username: '', full_name: '', nickname: '', chat_account_id: '', email: '' });
     const [resetPasswordData, setResetPasswordData] = useState({ new_password: '' });
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [searchTerm, setSearchTerm] = usePersistentState('users_search', '');
@@ -218,6 +218,8 @@ const UsersPage = () => {
         setEditUserData({
             username: user.username,
             full_name: user.full_name || '',
+            nickname: user.nickname || '',
+            chat_account_id: user.chat_account_id || '',
             email: user.email || ''
         });
         setIsEditOpen(true);
@@ -422,6 +424,26 @@ const UsersPage = () => {
                                 className="h-9 bg-muted/30 border-border rounded-md font-semibold"
                                 value={editUserData.full_name}
                                 onChange={(e) => setEditUserData({ ...editUserData, full_name: e.target.value })}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="edit-nickname" className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Nickname</Label>
+                            <Input
+                                id="edit-nickname"
+                                placeholder="Johnny"
+                                className="h-9 bg-muted/30 border-border rounded-md font-semibold"
+                                value={editUserData.nickname}
+                                onChange={(e) => setEditUserData({ ...editUserData, nickname: e.target.value })}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="edit-chat-account-id" className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Chat Account ID</Label>
+                            <Input
+                                id="edit-chat-account-id"
+                                placeholder="U01ABCDEF"
+                                className="h-9 bg-muted/30 border-border rounded-md font-semibold"
+                                value={editUserData.chat_account_id}
+                                onChange={(e) => setEditUserData({ ...editUserData, chat_account_id: e.target.value })}
                             />
                         </div>
                         <div className="space-y-2">

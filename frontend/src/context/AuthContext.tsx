@@ -15,6 +15,8 @@ interface User {
     id: string;
     username: string;
     full_name: string;
+    nickname: string;
+    chat_account_id: string;
     email: string;
     roles: any[];
 }
