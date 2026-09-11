@@ -556,7 +556,7 @@ const UsersPage = () => {
                                                     className="cursor-pointer hover:opacity-70 transition-opacity"
                                                     title="Edit user"
                                                 >{u.full_name || u.username}</span>
-                                                {u.username === 'admin' && <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />}
+                                                {u.is_super_admin && <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />}
                                             </p>
                                             <p className="text-xs text-muted-foreground font-medium flex items-center gap-1.5 mt-0.5">
                                                 <Mail className="w-3 h-3 opacity-50" /> {u.email || (u.username + '@system')}
@@ -611,7 +611,7 @@ const UsersPage = () => {
                                         >
                                             <Key className="w-4 h-4" />
                                         </Button>
-                                        {u.username !== 'admin' && (
+                                        {!u.is_super_admin && (
                                             <Button
                                                 variant="ghost"
                                                 size="icon"

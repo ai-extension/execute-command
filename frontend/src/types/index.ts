@@ -504,6 +504,7 @@ export interface Page {
 export interface User {
     id: string;
     username: string;
+    is_super_admin?: boolean;
     email?: string;
     full_name?: string;
     nickname?: string;

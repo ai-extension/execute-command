@@ -18,6 +18,7 @@ interface User {
     nickname: string;
     chat_account_id: string;
     email: string;
+    is_super_admin?: boolean;
     roles: any[];
 }
 
@@ -269,9 +270,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const hasPermission = useCallback((type: string, action: string, resourceId: string | null = null, namespaceId: string | null = null, tagIds: string[] = []): boolean => {
         if (!user || !user.username) return false;
-        // Superadmin is determined by holding the built-in "admin" role, not by username
-        // (mirrors the backend's domain.IsSuperAdmin).
-        if (user.roles?.some((role: any) => String(role?.name).toLowerCase() === 'admin')) return true;
+        // Superadmin is carried by the is_super_admin flag on the account — not by username
+        // and not by role name (mirrors the backend's domain.IsSuperAdmin).
+        if (user.is_super_admin) return true;
 
         const allPerms = user.roles?.flatMap(role => role.permissions || []) || [];
 
